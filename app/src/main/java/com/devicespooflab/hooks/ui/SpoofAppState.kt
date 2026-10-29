@@ -677,12 +677,32 @@ class ProfileEditorState {
             screenDensity = value(ConfigManager.FIELD_SCREEN_DENSITY).toIntOrNull() ?: screenDensity
             operatorAlpha = value(ConfigManager.FIELD_OPERATOR_ALPHA)
             operatorNumeric = value(ConfigManager.FIELD_OPERATOR_NUMERIC)
-            simOperatorAlpha = operatorAlpha
-            simOperatorNumeric = operatorNumeric
+            simOperatorAlpha = value(ConfigManager.FIELD_SIM_OPERATOR_ALPHA).ifBlank { operatorAlpha }
+            simOperatorNumeric = value(ConfigManager.FIELD_SIM_OPERATOR_NUMERIC).ifBlank { operatorNumeric }
             simCountryIso = value(ConfigManager.FIELD_SIM_COUNTRY)
             timezone = value(ConfigManager.FIELD_TIMEZONE)
             locale = value(ConfigManager.FIELD_LOCALE)
             androidId = advancedValue(ConfigManager.FIELD_ANDROID_ID)
+            socModel = value(ConfigManager.FIELD_SOC_MODEL)
+            socManufacturer = value(ConfigManager.FIELD_SOC_MANUFACTURER)
+            bootloader = value(ConfigManager.FIELD_BOOTLOADER)
+            baseband = value(ConfigManager.FIELD_BASEBAND)
+            buildUser = value(ConfigManager.FIELD_BUILD_USER)
+            buildHost = value(ConfigManager.FIELD_BUILD_HOST)
+            buildDateUtc = value(ConfigManager.FIELD_BUILD_DATE_UTC)
+            buildDate = value(ConfigManager.FIELD_BUILD_DATE)
+            gnssModel = value(ConfigManager.FIELD_GNSS_MODEL)
+            gnssYear = value(ConfigManager.FIELD_GNSS_YEAR).toIntOrNull() ?: gnssYear
+            buildDescription = value(ConfigManager.FIELD_BUILD_DESCRIPTION)
+            buildFlavor = value(ConfigManager.FIELD_BUILD_FLAVOR)
+            buildProduct = value(ConfigManager.FIELD_BUILD_PRODUCT)
+            buildCharacteristics = value(ConfigManager.FIELD_BUILD_CHARACTERISTICS)
+            serialNumber = value(ConfigManager.FIELD_SERIAL_NUMBER)
+            cpuAbi = value(ConfigManager.FIELD_CPU_ABI)
+            cpuAbiList = value(ConfigManager.FIELD_CPU_ABI_LIST)
+            cpuAbiList64 = value(ConfigManager.FIELD_CPU_ABI_LIST_64)
+            cpuAbiList32 = value(ConfigManager.FIELD_CPU_ABI_LIST_32)
+            userAgent = value(ConfigManager.FIELD_USER_AGENT)
         }
     }
 
@@ -744,9 +764,31 @@ class ProfileEditorState {
         values[ConfigManager.FIELD_SCREEN_DENSITY] = profile.screenDensity.toString()
         values[ConfigManager.FIELD_OPERATOR_ALPHA] = profile.operatorAlpha.orEmpty()
         values[ConfigManager.FIELD_OPERATOR_NUMERIC] = profile.operatorNumeric.orEmpty()
+        values[ConfigManager.FIELD_SIM_OPERATOR_ALPHA] = profile.simOperatorAlpha.orEmpty()
+        values[ConfigManager.FIELD_SIM_OPERATOR_NUMERIC] = profile.simOperatorNumeric.orEmpty()
         values[ConfigManager.FIELD_SIM_COUNTRY] = profile.simCountryIso.orEmpty()
         values[ConfigManager.FIELD_TIMEZONE] = profile.timezone.orEmpty()
         values[ConfigManager.FIELD_LOCALE] = profile.locale.orEmpty()
+        values[ConfigManager.FIELD_SOC_MODEL] = profile.socModel.orEmpty()
+        values[ConfigManager.FIELD_SOC_MANUFACTURER] = profile.socManufacturer.orEmpty()
+        values[ConfigManager.FIELD_BOOTLOADER] = profile.bootloader.orEmpty()
+        values[ConfigManager.FIELD_BASEBAND] = profile.baseband.orEmpty()
+        values[ConfigManager.FIELD_BUILD_USER] = profile.buildUser.orEmpty()
+        values[ConfigManager.FIELD_BUILD_HOST] = profile.buildHost.orEmpty()
+        values[ConfigManager.FIELD_BUILD_DATE_UTC] = profile.buildDateUtc.orEmpty()
+        values[ConfigManager.FIELD_BUILD_DATE] = profile.buildDate.orEmpty()
+        values[ConfigManager.FIELD_GNSS_MODEL] = profile.gnssModel.orEmpty()
+        values[ConfigManager.FIELD_GNSS_YEAR] = if (profile.gnssYear > 0) profile.gnssYear.toString() else ""
+        values[ConfigManager.FIELD_BUILD_DESCRIPTION] = profile.buildDescription.orEmpty()
+        values[ConfigManager.FIELD_BUILD_FLAVOR] = profile.buildFlavor.orEmpty()
+        values[ConfigManager.FIELD_BUILD_PRODUCT] = profile.buildProduct.orEmpty()
+        values[ConfigManager.FIELD_BUILD_CHARACTERISTICS] = profile.buildCharacteristics.orEmpty()
+        values[ConfigManager.FIELD_SERIAL_NUMBER] = profile.serialNumber.orEmpty()
+        values[ConfigManager.FIELD_CPU_ABI] = profile.cpuAbi.orEmpty()
+        values[ConfigManager.FIELD_CPU_ABI_LIST] = profile.cpuAbiList.orEmpty()
+        values[ConfigManager.FIELD_CPU_ABI_LIST_64] = profile.cpuAbiList64.orEmpty()
+        values[ConfigManager.FIELD_CPU_ABI_LIST_32] = profile.cpuAbiList32.orEmpty()
+        values[ConfigManager.FIELD_USER_AGENT] = profile.userAgent.orEmpty()
     }
 
     private fun value(fieldId: String): String = values[fieldId].orEmpty().trim()
@@ -774,9 +816,31 @@ class ProfileEditorState {
             ConfigManager.FIELD_SCREEN_DENSITY,
             ConfigManager.FIELD_OPERATOR_ALPHA,
             ConfigManager.FIELD_OPERATOR_NUMERIC,
+            ConfigManager.FIELD_SIM_OPERATOR_ALPHA,
+            ConfigManager.FIELD_SIM_OPERATOR_NUMERIC,
             ConfigManager.FIELD_SIM_COUNTRY,
             ConfigManager.FIELD_TIMEZONE,
             ConfigManager.FIELD_LOCALE,
+            ConfigManager.FIELD_SOC_MODEL,
+            ConfigManager.FIELD_SOC_MANUFACTURER,
+            ConfigManager.FIELD_BOOTLOADER,
+            ConfigManager.FIELD_BASEBAND,
+            ConfigManager.FIELD_BUILD_USER,
+            ConfigManager.FIELD_BUILD_HOST,
+            ConfigManager.FIELD_BUILD_DATE_UTC,
+            ConfigManager.FIELD_BUILD_DATE,
+            ConfigManager.FIELD_GNSS_MODEL,
+            ConfigManager.FIELD_GNSS_YEAR,
+            ConfigManager.FIELD_BUILD_DESCRIPTION,
+            ConfigManager.FIELD_BUILD_FLAVOR,
+            ConfigManager.FIELD_BUILD_PRODUCT,
+            ConfigManager.FIELD_BUILD_CHARACTERISTICS,
+            ConfigManager.FIELD_SERIAL_NUMBER,
+            ConfigManager.FIELD_CPU_ABI,
+            ConfigManager.FIELD_CPU_ABI_LIST,
+            ConfigManager.FIELD_CPU_ABI_LIST_64,
+            ConfigManager.FIELD_CPU_ABI_LIST_32,
+            ConfigManager.FIELD_USER_AGENT,
         )
         val advancedFields = listOf(
             ConfigManager.FIELD_ANDROID_ID,

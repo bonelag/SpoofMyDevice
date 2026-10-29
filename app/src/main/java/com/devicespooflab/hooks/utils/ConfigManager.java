@@ -93,6 +93,25 @@ public class ConfigManager {
     public static final String FIELD_BASEBAND = "baseband";
     public static final String FIELD_BUILD_USER = "build_user";
     public static final String FIELD_BUILD_HOST = "build_host";
+    public static final String FIELD_BOOTLOADER = "bootloader";
+    public static final String FIELD_SOC_MODEL = "soc_model";
+    public static final String FIELD_SOC_MANUFACTURER = "soc_manufacturer";
+    public static final String FIELD_BUILD_DATE_UTC = "build_date_utc";
+    public static final String FIELD_BUILD_DATE = "build_date";
+    public static final String FIELD_GNSS_MODEL = "gnss_model";
+    public static final String FIELD_GNSS_YEAR = "gnss_year";
+    public static final String FIELD_BUILD_DESCRIPTION = "build_description";
+    public static final String FIELD_BUILD_FLAVOR = "build_flavor";
+    public static final String FIELD_BUILD_PRODUCT = "build_product";
+    public static final String FIELD_BUILD_CHARACTERISTICS = "build_characteristics";
+    public static final String FIELD_SERIAL_NUMBER = "serial_number";
+    public static final String FIELD_CPU_ABI = "cpu_abi";
+    public static final String FIELD_CPU_ABI_LIST = "cpu_abi_list";
+    public static final String FIELD_CPU_ABI_LIST_64 = "cpu_abi_list_64";
+    public static final String FIELD_CPU_ABI_LIST_32 = "cpu_abi_list_32";
+    public static final String FIELD_USER_AGENT = "user_agent";
+    public static final String FIELD_SIM_OPERATOR_ALPHA = "sim_operator_alpha";
+    public static final String FIELD_SIM_OPERATOR_NUMERIC = "sim_operator_numeric";
 
     private static final long RETRY_INTERVAL_MS = 1500L;
 
@@ -1055,6 +1074,63 @@ public class ConfigManager {
         }
         if (key.equals("ro.build.host")) {
             return FIELD_BUILD_HOST;
+        }
+        if (key.equals("ro.bootloader")) {
+            return FIELD_BOOTLOADER;
+        }
+        if (key.equals("ro.soc.model")) {
+            return FIELD_SOC_MODEL;
+        }
+        if (key.equals("ro.soc.manufacturer")) {
+            return FIELD_SOC_MANUFACTURER;
+        }
+        if (key.equals("ro.build.date.utc")) {
+            return FIELD_BUILD_DATE_UTC;
+        }
+        if (key.equals("ro.build.date")) {
+            return FIELD_BUILD_DATE;
+        }
+        if (key.equals("device.gnss_model") || key.equals("ro.hardware.gps")) {
+            return FIELD_GNSS_MODEL;
+        }
+        if (key.equals("device.gnss_year")) {
+            return FIELD_GNSS_YEAR;
+        }
+        if (key.equals("ro.build.description")) {
+            return FIELD_BUILD_DESCRIPTION;
+        }
+        if (key.equals("ro.build.flavor")) {
+            return FIELD_BUILD_FLAVOR;
+        }
+        if (key.equals("ro.build.product")) {
+            return FIELD_BUILD_PRODUCT;
+        }
+        if (key.equals("ro.build.characteristics")) {
+            return FIELD_BUILD_CHARACTERISTICS;
+        }
+        if (key.equals("ro.serialno") || key.equals("ro.boot.serialno")) {
+            return FIELD_SERIAL_NUMBER;
+        }
+        if (key.equals("ro.product.cpu.abi")) {
+            return FIELD_CPU_ABI;
+        }
+        if (key.equals("ro.product.cpu.abilist")) {
+            return FIELD_CPU_ABI_LIST;
+        }
+        if (key.equals("ro.product.cpu.abilist64")) {
+            return FIELD_CPU_ABI_LIST_64;
+        }
+        if (key.equals("ro.product.cpu.abilist32")) {
+            return FIELD_CPU_ABI_LIST_32;
+        }
+        if (key.equals("webview.user_agent")) {
+            return FIELD_USER_AGENT;
+        }
+        if (key.equals("gsm.sim.operator.alpha")) {
+            return FIELD_SIM_OPERATOR_ALPHA;
+        }
+        if (key.equals("gsm.sim.operator.numeric")) {
+            return FIELD_SIM_OPERATOR_NUMERIC;
         }
         return null;
     }
