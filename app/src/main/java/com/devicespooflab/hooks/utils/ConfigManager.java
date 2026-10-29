@@ -1659,6 +1659,12 @@ public class ConfigManager {
         return 2025;
     }
 
+    public static boolean isTensorG6Device() {
+        String platform = getBoardPlatform().toLowerCase(Locale.US);
+        String board = getBuildBoard().toLowerCase(Locale.US);
+        return platform.contains("malibu") || board.contains("cubs") || board.contains("stallion");
+    }
+
     public static String getGpuVendor() {
         if (!isSpoofEnabled(FIELD_GPU_VENDOR)) {
             return null;
@@ -1666,6 +1672,9 @@ public class ConfigManager {
         String vendor = getFirstOptionalConfigValue("gpu.vendor");
         if (vendor != null && !vendor.isEmpty()) {
             return vendor;
+        }
+        if (isTensorG6Device()) {
+            return "Imagination Technologies";
         }
         return isGoogleTensorDevice() ? "ARM" : "Qualcomm";
     }
@@ -1678,6 +1687,9 @@ public class ConfigManager {
         if (renderer != null && !renderer.isEmpty()) {
             return renderer;
         }
+        if (isTensorG6Device()) {
+            return "PowerVR CXTP-48-1536";
+        }
         return isGoogleTensorDevice() ? "Mali-G715-Immortalis MC10" : "Adreno (TM) 830";
     }
 
@@ -1688,6 +1700,9 @@ public class ConfigManager {
         String gl = getFirstOptionalConfigValue("gl.version");
         if (gl != null && !gl.isEmpty()) {
             return gl;
+        }
+        if (isTensorG6Device()) {
+            return "OpenGL ES 3.2 (PowerVR Software v26.1)";
         }
         return isGoogleTensorDevice()
             ? "OpenGL ES 3.2 v1.r44p0-01eac0"
@@ -1776,14 +1791,23 @@ public class ConfigManager {
         if (coresStr != null && !coresStr.isEmpty()) {
             return parseInt(coresStr, 8);
         }
+        if (isTensorG6Device()) {
+            return 7;
+        }
         return isGoogleTensorDevice() ? 9 : 8;
     }
 
     public static String getHardwareEgl() {
+        if (isTensorG6Device()) {
+            return "powervr";
+        }
         return isGoogleTensorDevice() ? "mali" : "adreno";
     }
 
     public static String getHardwareVulkan() {
+        if (isTensorG6Device()) {
+            return "powervr";
+        }
         return isGoogleTensorDevice() ? "mali" : "adreno";
     }
 
@@ -1800,7 +1824,8 @@ public class ConfigManager {
         String board = getBuildBoard().toLowerCase(Locale.US);
         String platform = getBoardPlatform().toLowerCase(Locale.US);
         return mfg.contains("google") || board.contains("zuma") || board.contains("husky")
-            || board.contains("cheetah") || platform.contains("zuma") || platform.contains("gs201");
+            || board.contains("cheetah") || platform.contains("zuma") || platform.contains("gs201")
+            || board.contains("cubs") || board.contains("stallion") || platform.contains("malibu") || platform.contains("laguna");
     }
 
     public static File getCpuInfoFile() {

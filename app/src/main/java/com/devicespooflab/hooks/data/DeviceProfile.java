@@ -200,10 +200,21 @@ public class DeviceProfile {
         boolean isQcom = lowerSocMfg.contains("qualcomm") || lowerHw.contains("qcom")
             || lowerPlatform.contains("sun") || lowerPlatform.contains("taro")
             || lowerPlatform.contains("kona") || lowerPlatform.contains("kalama");
+        boolean isTensorG6 = lowerPlatform.contains("malibu") || lowerHw.contains("cubs") || lowerHw.contains("stallion");
         boolean isGoogleTensor = lowerSocMfg.contains("google") || lowerPlatform.contains("zuma")
-            || lowerPlatform.contains("gs") || lowerPlatform.contains("tensor");
+            || lowerPlatform.contains("gs") || lowerPlatform.contains("tensor") || isTensorG6;
 
-        if (isGoogleTensor) {
+        if (isTensorG6) {
+            gpuVendor = firstNonBlank(gpuVendor, "Imagination Technologies");
+            gpuRenderer = firstNonBlank(gpuRenderer, "PowerVR CXTP-48-1536");
+            glVersion = firstNonBlank(glVersion, "OpenGL ES 3.2 (PowerVR Software v26.1)");
+            glslVersion = firstNonBlank(glslVersion, "OpenGL ES GLSL ES 3.20");
+            vulkanVersion = firstNonBlank(vulkanVersion, "1.3.296");
+            vulkanDriverVersion = firstNonBlank(vulkanDriverVersion, "26.1.0");
+            vulkanLevel = vulkanLevel > 0 ? vulkanLevel : 1;
+            cpuHardware = firstNonBlank(cpuHardware, "Google Tensor G6");
+            cpuCores = cpuCores > 0 ? cpuCores : 7;
+        } else if (isGoogleTensor) {
             gpuVendor = firstNonBlank(gpuVendor, "ARM");
             gpuRenderer = firstNonBlank(gpuRenderer, "Mali-G715-Immortalis MC10");
             glVersion = firstNonBlank(glVersion, "OpenGL ES 3.2 v1.r44p0-01eac0");

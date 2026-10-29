@@ -423,7 +423,10 @@ public class ConfigFileManager {
     private String graphicsStack(DeviceProfile profile) {
         String manufacturer = nullable(profile.getManufacturer()).toLowerCase(Locale.US);
         String platform = firstNonBlank(profile.getBoardPlatform(), profile.getHardware()).toLowerCase(Locale.US);
-        if (manufacturer.contains("google") || platform.contains("gs") || platform.contains("tensor")) {
+        if (platform.contains("malibu") || platform.contains("cubs")) {
+            return "powervr";
+        }
+        if (manufacturer.contains("google") || platform.contains("gs") || platform.contains("tensor") || platform.contains("zuma")) {
             return "mali";
         }
         return "adreno";
