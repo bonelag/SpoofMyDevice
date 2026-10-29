@@ -2,6 +2,8 @@ package com.devicespooflab.hooks.data;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Build;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
 
@@ -91,7 +93,14 @@ public final class AppProfileStore {
     }
 
     public State load(Context context) throws Exception {
-        return parse(readFile(getStoreFile(context)));
+        String content = readFile(getStoreFile(context));
+        State state = parse(content);
+        try {
+            exportToSharedPreferences(context, state, content);
+            exportToSharedTmp(content);
+        } catch (Throwable ignored) {
+        }
+        return state;
     }
 
     public void save(Context context, State state) throws Exception {
@@ -115,14 +124,136 @@ public final class AppProfileStore {
         root.put("globalProperties", toJsonObject(state.getGlobalProperties()));
 
         File storeFile = getStoreFile(context);
+        String jsonString = root.toString(2);
         try (FileOutputStream outputStream = new FileOutputStream(storeFile, false)) {
-            outputStream.write(root.toString(2).getBytes(StandardCharsets.UTF_8));
+            outputStream.write(jsonString.getBytes(StandardCharsets.UTF_8));
         }
+
+        try {
+            exportToSharedPreferences(context, state, jsonString);
+            exportToSharedTmp(jsonString);
+        } catch (Throwable ignored) {
+        }
+
         context.sendBroadcast(new Intent(ConfigManager.ACTION_CONFIG_CHANGED));
+    }
+
+    private void exportToSharedTmp(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return;
+        }
+        try {
+            File dir = new File("/data/local/tmp/spoofmydevice");
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            dir.setReadable(true, false);
+            dir.setWritable(true, false);
+            dir.setExecutable(true, false);
+
+            File targetFile = new File(dir, "app_profiles.json");
+            try (FileOutputStream fos = new FileOutputStream(targetFile, false)) {
+                fos.write(jsonString.getBytes(StandardCharsets.UTF_8));
+            }
+            targetFile.setReadable(true, false);
+            targetFile.setWritable(true, false);
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            Runtime.getRuntime().exec(new String[]{"su", "-c", "mkdir -p /data/local/tmp/spoofmydevice && chmod 777 /data/local/tmp/spoofmydevice && chmod 666 /data/local/tmp/spoofmydevice/*"});
+        } catch (Throwable ignored) {
+        }
     }
 
     public File getStoreFile(Context context) {
         return new File(context.getFilesDir(), FILE_NAME);
+    }
+
+    public static String buildFullConfig(Profile profile, Map<String, String> globalProperties) {
+        if (profile == null) {
+            return null;
+        }
+        StringBuilder content = new StringBuilder(profile.getContent().trim());
+        if (globalProperties != null && !globalProperties.isEmpty()) {
+            content.append("\n\n# Global runtime options\n");
+            for (Map.Entry<String, String> entry : globalProperties.entrySet()) {
+                content.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
+            }
+        }
+        return content.toString();
+    }
+
+    private void exportToSharedPreferences(Context context, State state, String jsonString) {
+        if (context == null || state == null) {
+            return;
+        }
+        try {
+            exportToSinglePreferences(context.getSharedPreferences("app_profiles", Context.MODE_PRIVATE), state, jsonString);
+        } catch (Throwable ignored) {
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                Context deContext = context.createDeviceProtectedStorageContext();
+                if (deContext != null) {
+                    exportToSinglePreferences(deContext.getSharedPreferences("app_profiles", Context.MODE_PRIVATE), state, jsonString);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        try {
+            File dataDir = new File(context.getApplicationInfo().dataDir);
+            dataDir.setReadable(true, false);
+            dataDir.setExecutable(true, false);
+
+            File filesDir = context.getFilesDir();
+            if (filesDir != null) {
+                filesDir.setReadable(true, false);
+                filesDir.setExecutable(true, false);
+                File storeFile = getStoreFile(context);
+                if (storeFile.exists()) {
+                    storeFile.setReadable(true, false);
+                }
+            }
+
+            File spDir = new File(dataDir, "shared_prefs");
+            if (spDir.exists()) {
+                spDir.setReadable(true, false);
+                spDir.setExecutable(true, false);
+                File spFile = new File(spDir, "app_profiles.xml");
+                if (spFile.exists()) {
+                    spFile.setReadable(true, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void exportToSinglePreferences(SharedPreferences sp, State state, String jsonString) {
+        if (sp == null) {
+            return;
+        }
+        SharedPreferences.Editor editor = sp.edit();
+        editor.clear();
+        editor.putString("json_state", jsonString);
+
+        String defaultProfileId = state.getGlobalProperties().get(ConfigManager.KEY_DEFAULT_PROFILE_ID);
+        if (defaultProfileId != null) {
+            Profile defaultProfile = state.findProfile(defaultProfileId);
+            if (defaultProfile != null) {
+                editor.putString("default_config", buildFullConfig(defaultProfile, state.getGlobalProperties()));
+            }
+        }
+
+        for (Map.Entry<String, String> entry : state.getAssignments().entrySet()) {
+            Profile profile = state.findProfile(entry.getValue());
+            if (profile != null) {
+                editor.putString("pkg_" + entry.getKey(), buildFullConfig(profile, state.getGlobalProperties()));
+            }
+        }
+        editor.commit();
     }
 
     public static String resolveConfig(Context context, String packageName) {
@@ -142,14 +273,7 @@ public final class AppProfileStore {
             if (profile == null) {
                 return null;
             }
-            StringBuilder content = new StringBuilder(profile.getContent().trim());
-            if (!state.getGlobalProperties().isEmpty()) {
-                content.append("\n\n# Global runtime options\n");
-                for (Map.Entry<String, String> entry : state.getGlobalProperties().entrySet()) {
-                    content.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
-                }
-            }
-            return content.toString();
+            return buildFullConfig(profile, state.getGlobalProperties());
         } catch (Exception exception) {
             return null;
         }

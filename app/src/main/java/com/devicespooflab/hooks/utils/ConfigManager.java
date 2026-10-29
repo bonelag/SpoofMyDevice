@@ -13,15 +13,23 @@ import android.os.HandlerThread;
 import com.devicespooflab.hooks.ConfigProvider;
 import com.devicespooflab.hooks.ConfigBridgeReceiver;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+import de.robv.android.xposed.XSharedPreferences;
+import de.robv.android.xposed.XposedBridge;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Manages configuration for spoofed values.
@@ -139,17 +147,204 @@ public class ConfigManager {
     }
 
     private static LoadedProperties readConfig(Context preferredContext) {
-        Map<String, String> configFromProvider = readFromProvider(preferredContext);
-        if (!configFromProvider.isEmpty()) {
-            return new LoadedProperties(configFromProvider, false);
+        // 1. Try XSharedPreferences first (standard Xposed mechanism, works without Context at handleLoadPackage time)
+        try {
+            Map<String, String> configFromXsp = readFromXSharedPrefs();
+            if (!configFromXsp.isEmpty()) {
+                return new LoadedProperties(configFromXsp, false);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: readFromXSharedPrefs failed: " + t.getMessage());
         }
 
-        Map<String, String> configFromBridgeReceiver = readFromBridgeReceiver(preferredContext);
-        if (!configFromBridgeReceiver.isEmpty()) {
-            return new LoadedProperties(configFromBridgeReceiver, false);
+        // 2. Try direct file read
+        try {
+            Map<String, String> configFromDisk = readFromDirectFiles();
+            if (!configFromDisk.isEmpty()) {
+                return new LoadedProperties(configFromDisk, false);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: readFromDirectFiles failed: " + t.getMessage());
+        }
+
+        // 3. Try ContentProvider
+        try {
+            Map<String, String> configFromProvider = readFromProvider(preferredContext);
+            if (!configFromProvider.isEmpty()) {
+                return new LoadedProperties(configFromProvider, false);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: readFromProvider failed: " + t.getMessage());
+        }
+
+        // 4. Try BridgeReceiver
+        try {
+            Map<String, String> configFromBridgeReceiver = readFromBridgeReceiver(preferredContext);
+            if (!configFromBridgeReceiver.isEmpty()) {
+                return new LoadedProperties(configFromBridgeReceiver, false);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: readFromBridgeReceiver failed: " + t.getMessage());
         }
 
         return new LoadedProperties(getEmbeddedDefaults(), true);
+    }
+
+    private static Map<String, String> readFromXSharedPrefs() {
+        // Candidate 1: standard module preferences
+        try {
+            XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice", "app_profiles");
+            xsp.makeWorldReadable();
+            xsp.reload();
+
+            Map<String, String> result = extractFromXsp(xsp, "app_profiles");
+            if (!result.isEmpty()) {
+                return result;
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: XSP app_profiles error: " + t);
+        }
+
+        // Candidate 2: default preferences name
+        try {
+            XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice");
+            xsp.makeWorldReadable();
+            xsp.reload();
+
+            Map<String, String> result = extractFromXsp(xsp, "default");
+            if (!result.isEmpty()) {
+                return result;
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("SpoofMyDevice: XSP default error: " + t);
+        }
+
+        return Collections.emptyMap();
+    }
+
+    private static Map<String, String> extractFromXsp(XSharedPreferences xsp, String label) {
+        if (targetPackageName != null) {
+            String pkgConfig = xsp.getString("pkg_" + targetPackageName, null);
+            if (pkgConfig != null && !pkgConfig.trim().isEmpty()) {
+                InputStream stream = new java.io.ByteArrayInputStream(pkgConfig.getBytes(StandardCharsets.UTF_8));
+                Map<String, String> parsed = parseConfigStream(stream);
+                if (!parsed.isEmpty()) {
+                    XposedBridge.log("SpoofMyDevice: Loaded package profile via XSharedPreferences (" + label + ") for " + targetPackageName);
+                    return parsed;
+                }
+            }
+        }
+
+        String defConfig = xsp.getString("default_config", null);
+        if (defConfig != null && !defConfig.trim().isEmpty()) {
+            InputStream stream = new java.io.ByteArrayInputStream(defConfig.getBytes(StandardCharsets.UTF_8));
+            Map<String, String> parsed = parseConfigStream(stream);
+            if (!parsed.isEmpty()) {
+                XposedBridge.log("SpoofMyDevice: Loaded default profile via XSharedPreferences (" + label + ") for " + targetPackageName);
+                return parsed;
+            }
+        }
+
+        String jsonState = xsp.getString("json_state", null);
+        if (jsonState != null && !jsonState.trim().isEmpty()) {
+            Map<String, String> parsed = resolveConfigFromJson(jsonState, targetPackageName);
+            if (!parsed.isEmpty()) {
+                XposedBridge.log("SpoofMyDevice: Resolved profile from json_state in XSharedPreferences (" + label + ") for " + targetPackageName);
+                return parsed;
+            }
+        }
+
+        return Collections.emptyMap();
+    }
+
+    private static Map<String, String> readFromDirectFiles() {
+        String[] paths = new String[]{
+            "/data/local/tmp/spoofmydevice/app_profiles.json",
+            "/data/user_de/0/com.spoofmydevice/files/app_profiles.json",
+            "/data/user/0/com.spoofmydevice/files/app_profiles.json",
+            "/data/data/com.spoofmydevice/files/app_profiles.json"
+        };
+        for (String path : paths) {
+            try {
+                File file = new File(path);
+                XposedBridge.log("SpoofMyDevice: Check file " + path + ": exists=" + file.exists() + " canRead=" + file.canRead());
+                if (file.exists() && file.canRead()) {
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        byte[] bytes = new byte[(int) file.length()];
+                        int read = fis.read(bytes);
+                        if (read > 0) {
+                            String json = new String(bytes, 0, read, StandardCharsets.UTF_8);
+                            Map<String, String> parsed = resolveConfigFromJson(json, targetPackageName);
+                            if (!parsed.isEmpty()) {
+                                XposedBridge.log("SpoofMyDevice: Loaded profile from direct file " + path + " for " + targetPackageName);
+                                return parsed;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                XposedBridge.log("SpoofMyDevice: Direct file error for " + path + ": " + t.getMessage());
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    private static Map<String, String> resolveConfigFromJson(String json, String packageName) {
+        if (json == null || json.trim().isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            JSONObject root = new JSONObject(json);
+            JSONObject assignments = root.optJSONObject("assignments");
+            JSONObject globalProps = root.optJSONObject("globalProperties");
+
+            String profileId = null;
+            if (assignments != null && packageName != null) {
+                profileId = assignments.optString(packageName, null);
+                if (profileId != null && profileId.isEmpty()) {
+                    profileId = null;
+                }
+            }
+            if (profileId == null && globalProps != null) {
+                profileId = globalProps.optString(KEY_DEFAULT_PROFILE_ID, null);
+                if (profileId != null && profileId.isEmpty()) {
+                    profileId = null;
+                }
+            }
+            if (profileId == null) {
+                return Collections.emptyMap();
+            }
+
+            JSONArray profiles = root.optJSONArray("profiles");
+            if (profiles == null) {
+                return Collections.emptyMap();
+            }
+            String content = null;
+            for (int i = 0; i < profiles.length(); i++) {
+                JSONObject prof = profiles.getJSONObject(i);
+                if (profileId.equals(prof.optString("id"))) {
+                    content = prof.optString("content");
+                    break;
+                }
+            }
+            if (content == null) {
+                return Collections.emptyMap();
+            }
+
+            StringBuilder sb = new StringBuilder(content);
+            if (globalProps != null) {
+                sb.append("\n\n# Global runtime options\n");
+                java.util.Iterator<String> keys = globalProps.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    sb.append(key).append('=').append(globalProps.optString(key)).append('\n');
+                }
+            }
+            InputStream stream = new java.io.ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
+            return parseConfigStream(stream);
+        } catch (Throwable t) {
+            return Collections.emptyMap();
+        }
     }
 
     private static Map<String, String> readFromProvider(Context preferredContext) {

@@ -5,11 +5,11 @@
 *.class
 /build/
 /app/build/
-
+basic-check/
 # Gradle
 .gradle/
 local.properties
-
+jadx_out
 # IDE
 .idea/
 *.iml
