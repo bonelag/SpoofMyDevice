@@ -6,7 +6,7 @@
   "profile": {
     "brand": "samsung",
     "manufacturer": "samsung",
-    "model": "Galaxy S25 Ultra",
+    "model": "SM-S938B",
     "productName": "pa3q",
     "deviceCode": "pa3q",
     "board": "sun",
@@ -32,6 +32,7 @@
     "simOperatorNumeric": "310260",
     "simCountryIso": "us",
     "timezone": "America/Los_Angeles",
+    "bootloader": "S938BXXU0AXKG",
     "socModel": "Snapdragon 8 Elite for Galaxy",
     "socManufacturer": "Qualcomm",
     "baseband": "S938BXXU0AXKG",

@@ -32,6 +32,7 @@
     "simOperatorNumeric": "310260",
     "simCountryIso": "us",
     "timezone": "America/Los_Angeles",
+    "bootloader": "X900XXS9CYB1",
     "socModel": "Snapdragon 8 Gen 1",
     "socManufacturer": "Qualcomm",
     "baseband": "none",

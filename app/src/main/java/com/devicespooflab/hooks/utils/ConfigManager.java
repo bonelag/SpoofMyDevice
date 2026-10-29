@@ -720,7 +720,52 @@ public class ConfigManager {
         if (key.equals("ro.hardware.gps") || key.equals("ro.boot.hardware.gps")) {
             return getGnssHardwareModelName();
         }
+        if (isHostLeakProperty(key)) {
+            if (key.equals("ro.boot.product.hardware.sku") || key.equals("ro.boot.hardware.sku") || key.equals("ro.product.hardware.sku")) {
+                String sku = getFirstOptionalConfigValue("ro.boot.hardware.sku", "device.sku");
+                if (sku != null) return sku;
+                String brand = getBuildBrand();
+                String lowerBrand = brand != null ? brand.toLowerCase(Locale.US) : "";
+                if (lowerBrand.contains("samsung")) return "SM-S938B";
+                if (lowerBrand.contains("xiaomi")) return "xuanyuan";
+                return "";
+            }
+            return "";
+        }
         return defaultValue;
+    }
+
+    public static boolean isHostLeakProperty(String key) {
+        if (key == null || key.isEmpty()) {
+            return false;
+        }
+        String brand = getBuildBrand();
+        String lowerBrand = brand != null ? brand.toLowerCase(Locale.US) : "";
+        boolean isNonVivo = !lowerBrand.contains("vivo") && !lowerBrand.contains("iqoo");
+
+        if (isNonVivo) {
+            if (key.equals("vendor.gsm.project.baseband")
+                || key.startsWith("vendor.gsm.project.")
+                || key.equals("ro.boot.product.hardware.sku")
+                || key.equals("ro.boot.hardware.sku")
+                || key.equals("ro.product.hardware.sku")
+                || key.equals("ro.hardware.bbk")
+                || key.equals("ro.board.bbk")
+                || key.equals("ro.build.version.bbk")
+                || key.equals("ro.product.model.bbk")
+                || key.equals("ro.product.customize.bbk")
+                || key.equals("ro.product.net.entry.bbk")
+                || key.equals("ro.vivo.product.platform")
+                || key.equals("ro.vendor.mediatek.platform")
+                || key.equals("ro.vendor.soc.model")
+                || key.equals("ro.vendor.soc.model.external_name")
+                || key.equals("ro.vendor.soc.model.part_name")
+                || key.startsWith("persist.vivo.")
+                || key.startsWith("ro.vivo.")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Map<String, String> getEffectiveSystemProperties() {
@@ -739,6 +784,13 @@ public class ConfigManager {
                 continue;
             }
             result.put(key, entry.getValue() == null ? "" : entry.getValue());
+        }
+        result.entrySet().removeIf(entry -> isHostLeakProperty(entry.getKey()));
+        if (!result.containsKey("ro.boot.product.hardware.sku")) {
+            String sku = getSystemProperty("ro.boot.product.hardware.sku", "");
+            if (!sku.isEmpty()) {
+                result.put("ro.boot.product.hardware.sku", sku);
+            }
         }
         if (!result.containsKey("gsm.version.baseband")) {
             result.put("gsm.version.baseband", getBaseband());
@@ -1189,7 +1241,44 @@ public class ConfigManager {
     }
 
     public static String getWebViewUserAgent() {
-        return getConfigValue("webview.user_agent");
+        String ua = getConfigValue("webview.user_agent");
+        String targetModel = getBuildModel();
+        String targetRelease = getBuildVersionRelease();
+        if (targetRelease == null || targetRelease.isEmpty()) {
+            targetRelease = "15";
+        }
+        if (targetModel == null || targetModel.isEmpty()) {
+            targetModel = "Android";
+        }
+
+        // If the stored UA in json still contains host device strings (e.g. V2507A / PD2507 / vivo), purge it
+        if (ua != null && !ua.trim().isEmpty()) {
+            String lowerBrand = (getBuildBrand() != null ? getBuildBrand() : "").toLowerCase(Locale.US);
+            if (!lowerBrand.contains("vivo") && (ua.contains("V2507A") || ua.contains("PD2507") || ua.toLowerCase(Locale.US).contains("vivo"))) {
+                ua = null;
+            }
+        }
+
+        if (ua != null && !ua.trim().isEmpty()) {
+            return ua;
+        }
+
+        String buildId = getBuildId();
+        if (buildId != null && !buildId.isEmpty()) {
+            return String.format(
+                Locale.US,
+                "Mozilla/5.0 (Linux; Android %s; %s Build/%s; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36",
+                targetRelease,
+                targetModel,
+                buildId
+            );
+        }
+        return String.format(
+            Locale.US,
+            "Mozilla/5.0 (Linux; Android %s; %s) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+            targetRelease,
+            targetModel
+        );
     }
 
     public static String getCpuAbi() {
@@ -1206,6 +1295,46 @@ public class ConfigManager {
 
     public static String getCpuAbiList32() {
         return getConfigValue("ro.product.cpu.abilist32");
+    }
+
+    public static String getSocModel() {
+        String soc = getConfigValue("ro.soc.model");
+        if (soc != null && !soc.isEmpty()) {
+            return soc;
+        }
+        String board = getBuildBoard();
+        if (board != null && board.contains("sun")) {
+            return "Snapdragon 8 Elite";
+        }
+        return "";
+    }
+
+    public static String getSocManufacturer() {
+        String mfg = getConfigValue("ro.soc.manufacturer");
+        if (mfg != null && !mfg.isEmpty()) {
+            return mfg;
+        }
+        String hw = getBuildHardware();
+        if (hw != null && (hw.contains("qcom") || hw.contains("qualcomm"))) {
+            return "Qualcomm";
+        }
+        return "";
+    }
+
+    public static String getOdmSku() {
+        String sku = getFirstOptionalConfigValue("ro.boot.product.hardware.sku", "device.odm_sku");
+        if (sku != null) {
+            return sku;
+        }
+        return "";
+    }
+
+    public static String getSku() {
+        String sku = getFirstOptionalConfigValue("ro.boot.hardware.sku", "device.sku");
+        if (sku != null) {
+            return sku;
+        }
+        return "";
     }
 
     public static String getBaseband() {
@@ -1238,8 +1367,19 @@ public class ConfigManager {
             }
             return "MPSS.DE.1.0-" + incremental;
         } else if (lowerBrand.contains("samsung")) {
-            String model = getBuildModel();
-            return (model != null ? model : "S938B") + "XXU1AXL3";
+            String inc = getBuildVersionIncremental();
+            if (inc != null && inc.length() >= 8) {
+                int underscore = inc.indexOf('_');
+                return underscore > 0 ? inc.substring(0, underscore) : inc;
+            }
+            String dev = getBuildDevice();
+            if ("pa3q".equalsIgnoreCase(dev)) {
+                return "S938BXXU0AXKG";
+            }
+            if ("gts8uwifi".equalsIgnoreCase(dev)) {
+                return "";
+            }
+            return "S938BXXU0AXKG";
         } else if (lowerBrand.contains("google")) {
             return "g5300g-240913-241021-B-12543976";
         } else if (isQualcomm) {

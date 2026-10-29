@@ -187,6 +187,9 @@ public final class GetPropHooks {
         }
 
         String spoofedValue = ConfigManager.getSystemProperty(key, null);
+        if (spoofedValue == null && ConfigManager.isHostLeakProperty(key)) {
+            spoofedValue = "";
+        }
         if (spoofedValue == null) {
             return null;
         }
@@ -218,6 +221,7 @@ public final class GetPropHooks {
             }
         }
 
+        merged.entrySet().removeIf(entry -> ConfigManager.isHostLeakProperty(entry.getKey()));
         merged.putAll(spoofed);
 
         StringBuilder builder = new StringBuilder();

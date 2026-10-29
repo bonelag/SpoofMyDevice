@@ -32,6 +32,7 @@
     "simOperatorNumeric": "310260",
     "simCountryIso": "us",
     "timezone": "America/Los_Angeles",
+    "bootloader": "husky-15.0-13003188",
     "socModel": "Google Tensor G3",
     "socManufacturer": "Google",
     "baseband": "g5300i-240913-250117-B-12918843",

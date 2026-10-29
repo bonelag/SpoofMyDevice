@@ -117,6 +117,10 @@ public class BuildHooks {
         setStaticString(buildClass, "HOST", ConfigManager.getBuildHost());
         setStaticLong(buildClass, "TIME", ConfigManager.getBuildTime());
         setStaticString(buildClass, "RADIO", ConfigManager.getBaseband());
+        setStaticString(buildClass, "SKU", ConfigManager.getSku());
+        setStaticString(buildClass, "ODM_SKU", ConfigManager.getOdmSku());
+        setStaticString(buildClass, "SOC_MODEL", ConfigManager.getSocModel());
+        setStaticString(buildClass, "SOC_MANUFACTURER", ConfigManager.getSocManufacturer());
     }
 
     private static void applyVersionFields(Class<?> versionClass) {
@@ -153,6 +157,10 @@ public class BuildHooks {
         captureField(buildClass, "HOST", ORIGINAL_BUILD_FIELDS);
         captureField(buildClass, "TIME", ORIGINAL_BUILD_FIELDS);
         captureField(buildClass, "RADIO", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "SKU", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "ODM_SKU", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "SOC_MODEL", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "SOC_MANUFACTURER", ORIGINAL_BUILD_FIELDS);
     }
 
     private static void captureOriginalVersionFields(Class<?> versionClass) {
@@ -189,6 +197,10 @@ public class BuildHooks {
         restoreField(buildClass, "HOST", ORIGINAL_BUILD_FIELDS);
         restoreField(buildClass, "TIME", ORIGINAL_BUILD_FIELDS);
         restoreField(buildClass, "RADIO", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "SKU", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "ODM_SKU", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "SOC_MODEL", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "SOC_MANUFACTURER", ORIGINAL_BUILD_FIELDS);
     }
 
     private static void restoreVersionFields(Class<?> versionClass) {

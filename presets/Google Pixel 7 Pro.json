@@ -32,6 +32,7 @@
     "simOperatorNumeric": "310260",
     "simCountryIso": "us",
     "timezone": "America/Los_Angeles",
+    "bootloader": "cheetah-15.0-13003188",
     "socModel": "gs201",
     "socManufacturer": "Google",
     "baseband": "g5300g-240913-250117-B-12918843",

@@ -64,6 +64,8 @@ public class SystemPropertiesHooks {
 
                         if (spoofedValue != null) {
                             param.setResult(spoofedValue);
+                        } else if (ConfigManager.isHostLeakProperty(key)) {
+                            param.setResult("");
                         }
                     }
                 });
@@ -86,6 +88,8 @@ public class SystemPropertiesHooks {
 
                         if (spoofedValue != null) {
                             param.setResult(spoofedValue);
+                        } else if (ConfigManager.isHostLeakProperty(key)) {
+                            param.setResult("");
                         }
                     }
                 });

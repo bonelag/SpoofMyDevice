@@ -22,9 +22,33 @@ public class WebViewHooks {
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             hookWebSettings(lpparam);
+            hookDefaultUserAgent(lpparam);
             hookWebViewConstructor(lpparam);
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook WebView: " + e.getMessage());
+        }
+    }
+
+    private static void hookDefaultUserAgent(XC_LoadPackage.LoadPackageParam lpparam) {
+        Class<?> webSettingsClass = XposedHelpers.findClassIfExists(
+            "android.webkit.WebSettings", lpparam.classLoader);
+        if (webSettingsClass == null) {
+            webSettingsClass = XposedHelpers.findClassIfExists("android.webkit.WebSettings", null);
+        }
+        if (webSettingsClass != null) {
+            try {
+                XposedHelpers.findAndHookMethod(webSettingsClass, "getDefaultUserAgent", Context.class,
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                            String spoofedUA = ConfigManager.getWebViewUserAgent();
+                            if (spoofedUA != null && !spoofedUA.trim().isEmpty()) {
+                                param.setResult(spoofedUA);
+                            }
+                        }
+                    });
+            } catch (Throwable ignored) {
+            }
         }
     }
 
@@ -59,6 +83,20 @@ public class WebViewHooks {
                                 } catch (Exception e) {
                                     // Failed to set, that's okay
                                 }
+                            }
+
+                            try {
+                                XposedHelpers.findAndHookMethod(settingsClass, "getUserAgentString",
+                                    new XC_MethodHook() {
+                                        @Override
+                                        protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                                            String targetUA = ConfigManager.getWebViewUserAgent();
+                                            if (targetUA != null && !targetUA.trim().isEmpty()) {
+                                                param.setResult(targetUA);
+                                            }
+                                        }
+                                    });
+                            } catch (Throwable ignored) {
                             }
                         }
                     }
