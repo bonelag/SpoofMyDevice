@@ -492,6 +492,15 @@ public class DevicePresetCatalog {
         profile.setBuildDate(jsonObject.optString("buildDate"));
         profile.setGnssModel(jsonObject.optString("gnssModel"));
         profile.setGnssYear(jsonObject.optInt("gnssYear", 0));
+        profile.setGpuVendor(jsonObject.optString("gpuVendor"));
+        profile.setGpuRenderer(jsonObject.optString("gpuRenderer"));
+        profile.setGlVersion(jsonObject.optString("glVersion"));
+        profile.setGlslVersion(jsonObject.optString("glslVersion"));
+        profile.setVulkanVersion(jsonObject.optString("vulkanVersion"));
+        profile.setVulkanDriverVersion(jsonObject.optString("vulkanDriverVersion"));
+        profile.setVulkanLevel(jsonObject.optInt("vulkanLevel", 1));
+        profile.setCpuHardware(jsonObject.optString("cpuHardware"));
+        profile.setCpuCores(jsonObject.optInt("cpuCores", 8));
         return profile;
     }
 }

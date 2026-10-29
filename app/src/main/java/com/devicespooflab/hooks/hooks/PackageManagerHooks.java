@@ -84,6 +84,15 @@ public class PackageManagerHooks {
                         if (feature == null) {
                             return;
                         }
+                        int version = (Integer) param.args[1];
+                        if ("android.hardware.vulkan.version".equals(feature)) {
+                            param.setResult(version <= ConfigManager.getVulkanVersionCode());
+                            return;
+                        }
+                        if ("android.hardware.vulkan.level".equals(feature)) {
+                            param.setResult(version <= ConfigManager.getVulkanLevel());
+                            return;
+                        }
                         Boolean override = overrideFeature(feature);
                         if (override != null) {
                             param.setResult(override);
@@ -113,8 +122,18 @@ public class PackageManagerHooks {
                             try {
                                 String name = (String) XposedHelpers.getObjectField(feature, "name");
                                 if (name == null) {
+                                    int reqGl = XposedHelpers.getIntField(feature, "reqGlEsVersion");
+                                    if (reqGl > 0) {
+                                        XposedHelpers.setIntField(feature, "reqGlEsVersion", ConfigManager.getGlEsVersionCode());
+                                    }
                                     filtered.add(feature);
                                     continue;
+                                }
+
+                                if ("android.hardware.vulkan.version".equals(name)) {
+                                    XposedHelpers.setIntField(feature, "version", ConfigManager.getVulkanVersionCode());
+                                } else if ("android.hardware.vulkan.level".equals(name)) {
+                                    XposedHelpers.setIntField(feature, "version", ConfigManager.getVulkanLevel());
                                 }
 
                                 Boolean override = overrideFeature(name);

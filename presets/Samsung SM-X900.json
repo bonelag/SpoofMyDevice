@@ -41,6 +41,15 @@
     "buildDateUtc": "1738368000",
     "buildDate": "Sat Feb 1 00:00:00 UTC 2025",
     "gnssModel": "Qualcomm GNSS",
-    "gnssYear": 2022
+    "gnssYear": 2022,
+    "gpuVendor": "Qualcomm",
+    "gpuRenderer": "Adreno (TM) 730",
+    "glVersion": "OpenGL ES 3.2 V@0615.0",
+    "glslVersion": "OpenGL ES GLSL ES 3.20",
+    "vulkanVersion": "1.3.218",
+    "vulkanDriverVersion": "512.615.0",
+    "vulkanLevel": 1,
+    "cpuHardware": "Qualcomm Technologies, Inc SM8450",
+    "cpuCores": 8
   }
 }

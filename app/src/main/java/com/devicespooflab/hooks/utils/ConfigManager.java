@@ -112,6 +112,15 @@ public class ConfigManager {
     public static final String FIELD_USER_AGENT = "user_agent";
     public static final String FIELD_SIM_OPERATOR_ALPHA = "sim_operator_alpha";
     public static final String FIELD_SIM_OPERATOR_NUMERIC = "sim_operator_numeric";
+    public static final String FIELD_GPU_VENDOR = "gpu_vendor";
+    public static final String FIELD_GPU_RENDERER = "gpu_renderer";
+    public static final String FIELD_GL_VERSION = "gl_version";
+    public static final String FIELD_GLSL_VERSION = "glsl_version";
+    public static final String FIELD_VULKAN_VERSION = "vulkan_version";
+    public static final String FIELD_VULKAN_DRIVER_VERSION = "vulkan_driver_version";
+    public static final String FIELD_VULKAN_LEVEL = "vulkan_level";
+    public static final String FIELD_CPU_HARDWARE = "cpu_hardware";
+    public static final String FIELD_CPU_CORES = "cpu_cores";
 
     private static final long RETRY_INTERVAL_MS = 1500L;
 
@@ -739,6 +748,30 @@ public class ConfigManager {
         if (key.equals("ro.hardware.gps") || key.equals("ro.boot.hardware.gps")) {
             return getGnssHardwareModelName();
         }
+        if (key.equals("ro.hardware.egl")) {
+            return getHardwareEgl();
+        }
+        if (key.equals("ro.hardware.vulkan") || key.equals("ro.boot.hardware.vulkan")) {
+            return getHardwareVulkan();
+        }
+        if (key.equals("ro.opengles.version")) {
+            return getOpenGlesVersion();
+        }
+        if (key.equals("ro.cpuvulkan.version")) {
+            return getCpuVulkanVersion();
+        }
+        if (key.equals("vendor.gpu.model")) {
+            return getGpuRenderer();
+        }
+        if (key.equals("ro.soc.model")) {
+            return getSocModel();
+        }
+        if (key.equals("ro.soc.manufacturer")) {
+            return getSocManufacturer();
+        }
+        if (key.equals("ro.chipname") || key.equals("ro.hardware.chipname")) {
+            return getBoardPlatform();
+        }
         if (isHostLeakProperty(key)) {
             if (key.equals("ro.boot.product.hardware.sku") || key.equals("ro.boot.hardware.sku") || key.equals("ro.product.hardware.sku")) {
                 String sku = getFirstOptionalConfigValue("ro.boot.hardware.sku", "device.sku");
@@ -776,11 +809,18 @@ public class ConfigManager {
                 || key.equals("ro.product.net.entry.bbk")
                 || key.equals("ro.vivo.product.platform")
                 || key.equals("ro.vendor.mediatek.platform")
+                || key.startsWith("ro.vendor.mediatek.")
+                || key.startsWith("ro.mediatek.")
+                || key.startsWith("ro.vendor.mtk.")
+                || key.startsWith("ro.mtk.")
                 || key.equals("ro.vendor.soc.model")
                 || key.equals("ro.vendor.soc.model.external_name")
                 || key.equals("ro.vendor.soc.model.part_name")
                 || key.startsWith("persist.vivo.")
-                || key.startsWith("ro.vivo.")) {
+                || key.startsWith("ro.vivo.")
+                || key.equals("vendor.gpu.model")
+                || key.startsWith("ro.vendor.gpu.")
+                || key.startsWith("vendor.gpu.")) {
                 return true;
             }
         }
@@ -1132,6 +1172,33 @@ public class ConfigManager {
         if (key.equals("gsm.sim.operator.numeric")) {
             return FIELD_SIM_OPERATOR_NUMERIC;
         }
+        if (key.equals("gpu.vendor")) {
+            return FIELD_GPU_VENDOR;
+        }
+        if (key.equals("gpu.renderer") || key.equals("vendor.gpu.model")) {
+            return FIELD_GPU_RENDERER;
+        }
+        if (key.equals("gl.version")) {
+            return FIELD_GL_VERSION;
+        }
+        if (key.equals("gl.sl_version")) {
+            return FIELD_GLSL_VERSION;
+        }
+        if (key.equals("vulkan.version")) {
+            return FIELD_VULKAN_VERSION;
+        }
+        if (key.equals("vulkan.driver_version")) {
+            return FIELD_VULKAN_DRIVER_VERSION;
+        }
+        if (key.equals("vulkan.level")) {
+            return FIELD_VULKAN_LEVEL;
+        }
+        if (key.equals("cpu.hardware")) {
+            return FIELD_CPU_HARDWARE;
+        }
+        if (key.equals("cpu.cores")) {
+            return FIELD_CPU_CORES;
+        }
         return null;
     }
 
@@ -1258,6 +1325,14 @@ public class ConfigManager {
 
     public static String getBuildBoard() {
         return getConfigValue("ro.product.board");
+    }
+
+    public static String getBoardPlatform() {
+        String platform = getConfigValue("ro.board.platform");
+        if (platform != null && !platform.isEmpty()) {
+            return platform;
+        }
+        return getBuildBoard();
     }
 
     public static String getBuildHardware() {
@@ -1582,6 +1657,192 @@ public class ConfigManager {
             }
         }
         return 2025;
+    }
+
+    public static String getGpuVendor() {
+        if (!isSpoofEnabled(FIELD_GPU_VENDOR)) {
+            return null;
+        }
+        String vendor = getFirstOptionalConfigValue("gpu.vendor");
+        if (vendor != null && !vendor.isEmpty()) {
+            return vendor;
+        }
+        return isGoogleTensorDevice() ? "ARM" : "Qualcomm";
+    }
+
+    public static String getGpuRenderer() {
+        if (!isSpoofEnabled(FIELD_GPU_RENDERER)) {
+            return null;
+        }
+        String renderer = getFirstOptionalConfigValue("gpu.renderer", "vendor.gpu.model");
+        if (renderer != null && !renderer.isEmpty()) {
+            return renderer;
+        }
+        return isGoogleTensorDevice() ? "Mali-G715-Immortalis MC10" : "Adreno (TM) 830";
+    }
+
+    public static String getGlVersion() {
+        if (!isSpoofEnabled(FIELD_GL_VERSION)) {
+            return null;
+        }
+        String gl = getFirstOptionalConfigValue("gl.version");
+        if (gl != null && !gl.isEmpty()) {
+            return gl;
+        }
+        return isGoogleTensorDevice()
+            ? "OpenGL ES 3.2 v1.r44p0-01eac0"
+            : "OpenGL ES 3.2 V@0797.0 (GIT@e7ff6ef885, I677ff0eb96, 1729000109) (Date:10/15/24)";
+    }
+
+    public static String getGlslVersion() {
+        if (!isSpoofEnabled(FIELD_GLSL_VERSION)) {
+            return null;
+        }
+        String glsl = getFirstOptionalConfigValue("gl.sl_version");
+        if (glsl != null && !glsl.isEmpty()) {
+            return glsl;
+        }
+        return "OpenGL ES GLSL ES 3.20";
+    }
+
+    public static String getVulkanVersion() {
+        if (!isSpoofEnabled(FIELD_VULKAN_VERSION)) {
+            return null;
+        }
+        String vk = getFirstOptionalConfigValue("vulkan.version");
+        if (vk != null && !vk.isEmpty()) {
+            return vk;
+        }
+        return isGoogleTensorDevice() ? "1.3.268" : "1.3.296";
+    }
+
+    public static int getVulkanVersionCode() {
+        String vk = getVulkanVersion();
+        if (vk == null || vk.isEmpty()) {
+            return 0x403000;
+        }
+        try {
+            String[] parts = vk.split("\\.");
+            int major = Integer.parseInt(parts[0]);
+            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+            int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+            return (major << 22) | (minor << 12) | patch;
+        } catch (Throwable t) {
+            return 0x403000;
+        }
+    }
+
+    public static int getGlEsVersionCode() {
+        return 0x00030002;
+    }
+
+    public static int getVulkanLevel() {
+        if (!isSpoofEnabled(FIELD_VULKAN_LEVEL)) {
+            return 1;
+        }
+        return parseInt(getFirstOptionalConfigValue("vulkan.level"), 1);
+    }
+
+    public static String getVulkanDriverVersion() {
+        if (!isSpoofEnabled(FIELD_VULKAN_DRIVER_VERSION)) {
+            return null;
+        }
+        String drv = getFirstOptionalConfigValue("vulkan.driver_version");
+        if (drv != null && !drv.isEmpty()) {
+            return drv;
+        }
+        return isGoogleTensorDevice() ? "44.0.0" : "512.797.0";
+    }
+
+    public static String getCpuHardware() {
+        if (!isSpoofEnabled(FIELD_CPU_HARDWARE)) {
+            return null;
+        }
+        String cpuHw = getFirstOptionalConfigValue("cpu.hardware");
+        if (cpuHw != null && !cpuHw.isEmpty()) {
+            return cpuHw;
+        }
+        if (isGoogleTensorDevice()) {
+            return "Google Tensor G3";
+        }
+        return "Qualcomm Technologies, Inc SM8750";
+    }
+
+    public static int getCpuCores() {
+        if (!isSpoofEnabled(FIELD_CPU_CORES)) {
+            return 8;
+        }
+        String coresStr = getFirstOptionalConfigValue("cpu.cores");
+        if (coresStr != null && !coresStr.isEmpty()) {
+            return parseInt(coresStr, 8);
+        }
+        return isGoogleTensorDevice() ? 9 : 8;
+    }
+
+    public static String getHardwareEgl() {
+        return isGoogleTensorDevice() ? "mali" : "adreno";
+    }
+
+    public static String getHardwareVulkan() {
+        return isGoogleTensorDevice() ? "mali" : "adreno";
+    }
+
+    public static String getOpenGlesVersion() {
+        return "196610";
+    }
+
+    public static String getCpuVulkanVersion() {
+        return "4206592";
+    }
+
+    public static boolean isGoogleTensorDevice() {
+        String mfg = getSocManufacturer().toLowerCase(Locale.US);
+        String board = getBuildBoard().toLowerCase(Locale.US);
+        String platform = getBoardPlatform().toLowerCase(Locale.US);
+        return mfg.contains("google") || board.contains("zuma") || board.contains("husky")
+            || board.contains("cheetah") || platform.contains("zuma") || platform.contains("gs201");
+    }
+
+    public static File getCpuInfoFile() {
+        File file = new File("/data/local/tmp/spoofmydevice/cpuinfo");
+        if (file.exists() && file.length() > 0) {
+            return file;
+        }
+        return ensureCpuInfoFile();
+    }
+
+    public static synchronized File ensureCpuInfoFile() {
+        try {
+            File dir = new File("/data/local/tmp/spoofmydevice");
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            File file = new File(dir, "cpuinfo");
+            int cores = getCpuCores();
+            String cpuHw = getCpuHardware();
+            boolean isTensor = isGoogleTensorDevice();
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < cores; i++) {
+                sb.append("processor\t: ").append(i).append("\n");
+                sb.append("BogoMIPS\t: ").append(isTensor ? "26.00" : "38.40").append("\n");
+                sb.append("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512\n");
+                sb.append("CPU implementer\t: ").append(isTensor ? "0x41" : "0x51").append("\n");
+                sb.append("CPU architecture: 8\n");
+                sb.append("CPU variant\t: 0x0\n");
+                sb.append("CPU part\t: ").append(isTensor ? "0xd46" : "0x001").append("\n");
+                sb.append("CPU revision\t: 0\n\n");
+            }
+            sb.append("Hardware\t: ").append(cpuHw).append("\n");
+
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
+            fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
+            fos.close();
+            file.setReadable(true, false);
+            return file;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private static int parseInt(String value, int fallback) {

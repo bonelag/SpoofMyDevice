@@ -55,7 +55,10 @@ public class HardwareHooks {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        param.setResult(PIXEL_7_PRO_CORES);
+                        int cores = ConfigManager.getCpuCores();
+                        if (cores > 0) {
+                            param.setResult(cores);
+                        }
                     }
                 });
         } catch (Exception e) {
@@ -143,22 +146,74 @@ public class HardwareHooks {
      * Hook file reads to intercept /proc/cpuinfo and /proc/meminfo
      */
     private static void hookFileReads() {
-        // Hook BufferedReader for /proc/cpuinfo
+        // Intercept FileInputStream for /proc/cpuinfo
         try {
-            XposedHelpers.findAndHookConstructor(BufferedReader.class,
-                java.io.Reader.class,
+            XposedHelpers.findAndHookConstructor(java.io.FileInputStream.class, File.class,
                 new XC_MethodHook() {
                     @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        BufferedReader reader = (BufferedReader) param.thisObject;
-                        // Check if reading from FileReader
-                        if (param.args[0] instanceof FileReader) {
-                            // We'll intercept readLine() calls instead
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        File file = (File) param.args[0];
+                        if (file != null && "/proc/cpuinfo".equals(file.getPath())) {
+                            File fakeCpuInfo = ConfigManager.getCpuInfoFile();
+                            if (fakeCpuInfo != null && fakeCpuInfo.exists()) {
+                                param.args[0] = fakeCpuInfo;
+                            }
                         }
                     }
                 });
-        } catch (Exception e) {
-            // Ignore
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            XposedHelpers.findAndHookConstructor(java.io.FileInputStream.class, String.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        String path = (String) param.args[0];
+                        if ("/proc/cpuinfo".equals(path)) {
+                            File fakeCpuInfo = ConfigManager.getCpuInfoFile();
+                            if (fakeCpuInfo != null && fakeCpuInfo.exists()) {
+                                param.args[0] = fakeCpuInfo.getAbsolutePath();
+                            }
+                        }
+                    }
+                });
+        } catch (Throwable ignored) {
+        }
+
+        // Intercept RandomAccessFile for /proc/cpuinfo
+        try {
+            XposedHelpers.findAndHookConstructor(RandomAccessFile.class, File.class, String.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        File file = (File) param.args[0];
+                        if (file != null && "/proc/cpuinfo".equals(file.getPath())) {
+                            File fakeCpuInfo = ConfigManager.getCpuInfoFile();
+                            if (fakeCpuInfo != null && fakeCpuInfo.exists()) {
+                                param.args[0] = fakeCpuInfo;
+                            }
+                        }
+                    }
+                });
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            XposedHelpers.findAndHookConstructor(RandomAccessFile.class, String.class, String.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        String path = (String) param.args[0];
+                        if ("/proc/cpuinfo".equals(path)) {
+                            File fakeCpuInfo = ConfigManager.getCpuInfoFile();
+                            if (fakeCpuInfo != null && fakeCpuInfo.exists()) {
+                                param.args[0] = fakeCpuInfo.getAbsolutePath();
+                            }
+                        }
+                    }
+                });
+        } catch (Throwable ignored) {
         }
 
         // Hook RandomAccessFile reads for /proc/meminfo
@@ -169,29 +224,9 @@ public class HardwareHooks {
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String line = (String) param.getResult();
                         if (line != null) {
-                            // Spoof MemTotal in /proc/meminfo
                             if (line.startsWith("MemTotal:")) {
                                 param.setResult("MemTotal:       " + PIXEL_7_PRO_RAM_KB + " kB");
                             }
-                        }
-                    }
-                });
-        } catch (Exception e) {
-            // Ignore
-        }
-
-        // Hook File operations for /proc/cpuinfo
-        try {
-            XposedHelpers.findAndHookMethod(File.class, "exists",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        File file = (File) param.thisObject;
-                        String path = file.getAbsolutePath();
-
-                        // Ensure /proc/cpuinfo exists (some apps check this)
-                        if (path.equals("/proc/cpuinfo") || path.equals("/proc/meminfo")) {
-                            // Let it pass through normally
                         }
                     }
                 });

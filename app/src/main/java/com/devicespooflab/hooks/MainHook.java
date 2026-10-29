@@ -17,6 +17,7 @@ import com.devicespooflab.hooks.hooks.HardwareHooks;
 import com.devicespooflab.hooks.hooks.JavaSystemPropertyHooks;
 import com.devicespooflab.hooks.hooks.LocaleHooks;
 import com.devicespooflab.hooks.hooks.MediaDrmHooks;
+import com.devicespooflab.hooks.hooks.OpenGLHooks;
 import com.devicespooflab.hooks.hooks.PackageManagerHooks;
 import com.devicespooflab.hooks.hooks.SettingsHooks;
 import com.devicespooflab.hooks.hooks.SystemPropertiesHooks;
@@ -138,6 +139,13 @@ public class MainHook implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + ": HardwareHooks loaded");
         } catch (Exception exception) {
             XposedBridge.log(TAG + ": HardwareHooks failed: " + exception.getMessage());
+        }
+
+        try {
+            OpenGLHooks.hook(lpparam);
+            XposedBridge.log(TAG + ": OpenGLHooks loaded");
+        } catch (Exception exception) {
+            XposedBridge.log(TAG + ": OpenGLHooks failed: " + exception.getMessage());
         }
 
         try {

@@ -703,6 +703,15 @@ class ProfileEditorState {
             cpuAbiList64 = value(ConfigManager.FIELD_CPU_ABI_LIST_64)
             cpuAbiList32 = value(ConfigManager.FIELD_CPU_ABI_LIST_32)
             userAgent = value(ConfigManager.FIELD_USER_AGENT)
+            gpuVendor = value(ConfigManager.FIELD_GPU_VENDOR)
+            gpuRenderer = value(ConfigManager.FIELD_GPU_RENDERER)
+            glVersion = value(ConfigManager.FIELD_GL_VERSION)
+            glslVersion = value(ConfigManager.FIELD_GLSL_VERSION)
+            vulkanVersion = value(ConfigManager.FIELD_VULKAN_VERSION)
+            vulkanDriverVersion = value(ConfigManager.FIELD_VULKAN_DRIVER_VERSION)
+            vulkanLevel = value(ConfigManager.FIELD_VULKAN_LEVEL).toIntOrNull() ?: vulkanLevel
+            cpuHardware = value(ConfigManager.FIELD_CPU_HARDWARE)
+            cpuCores = value(ConfigManager.FIELD_CPU_CORES).toIntOrNull() ?: cpuCores
         }
     }
 
@@ -789,6 +798,15 @@ class ProfileEditorState {
         values[ConfigManager.FIELD_CPU_ABI_LIST_64] = profile.cpuAbiList64.orEmpty()
         values[ConfigManager.FIELD_CPU_ABI_LIST_32] = profile.cpuAbiList32.orEmpty()
         values[ConfigManager.FIELD_USER_AGENT] = profile.userAgent.orEmpty()
+        values[ConfigManager.FIELD_GPU_VENDOR] = profile.gpuVendor.orEmpty()
+        values[ConfigManager.FIELD_GPU_RENDERER] = profile.gpuRenderer.orEmpty()
+        values[ConfigManager.FIELD_GL_VERSION] = profile.glVersion.orEmpty()
+        values[ConfigManager.FIELD_GLSL_VERSION] = profile.glslVersion.orEmpty()
+        values[ConfigManager.FIELD_VULKAN_VERSION] = profile.vulkanVersion.orEmpty()
+        values[ConfigManager.FIELD_VULKAN_DRIVER_VERSION] = profile.vulkanDriverVersion.orEmpty()
+        values[ConfigManager.FIELD_VULKAN_LEVEL] = if (profile.vulkanLevel > 0) profile.vulkanLevel.toString() else "1"
+        values[ConfigManager.FIELD_CPU_HARDWARE] = profile.cpuHardware.orEmpty()
+        values[ConfigManager.FIELD_CPU_CORES] = if (profile.cpuCores > 0) profile.cpuCores.toString() else "8"
     }
 
     private fun value(fieldId: String): String = values[fieldId].orEmpty().trim()
@@ -841,6 +859,15 @@ class ProfileEditorState {
             ConfigManager.FIELD_CPU_ABI_LIST_64,
             ConfigManager.FIELD_CPU_ABI_LIST_32,
             ConfigManager.FIELD_USER_AGENT,
+            ConfigManager.FIELD_GPU_VENDOR,
+            ConfigManager.FIELD_GPU_RENDERER,
+            ConfigManager.FIELD_GL_VERSION,
+            ConfigManager.FIELD_GLSL_VERSION,
+            ConfigManager.FIELD_VULKAN_VERSION,
+            ConfigManager.FIELD_VULKAN_DRIVER_VERSION,
+            ConfigManager.FIELD_VULKAN_LEVEL,
+            ConfigManager.FIELD_CPU_HARDWARE,
+            ConfigManager.FIELD_CPU_CORES,
         )
         val advancedFields = listOf(
             ConfigManager.FIELD_ANDROID_ID,

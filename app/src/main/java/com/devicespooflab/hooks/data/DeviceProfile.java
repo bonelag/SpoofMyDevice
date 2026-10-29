@@ -51,6 +51,15 @@ public class DeviceProfile {
     private String buildDate;
     private String gnssModel;
     private int gnssYear;
+    private String gpuVendor;
+    private String gpuRenderer;
+    private String glVersion;
+    private String glslVersion;
+    private String vulkanVersion;
+    private String vulkanDriverVersion;
+    private int vulkanLevel;
+    private String cpuHardware;
+    private int cpuCores;
 
     public DeviceProfile() {
     }
@@ -102,6 +111,15 @@ public class DeviceProfile {
         this.buildDate = other.buildDate;
         this.gnssModel = other.gnssModel;
         this.gnssYear = other.gnssYear;
+        this.gpuVendor = other.gpuVendor;
+        this.gpuRenderer = other.gpuRenderer;
+        this.glVersion = other.glVersion;
+        this.glslVersion = other.glslVersion;
+        this.vulkanVersion = other.vulkanVersion;
+        this.vulkanDriverVersion = other.vulkanDriverVersion;
+        this.vulkanLevel = other.vulkanLevel;
+        this.cpuHardware = other.cpuHardware;
+        this.cpuCores = other.cpuCores;
     }
 
     public DeviceProfile copy() {
@@ -175,6 +193,47 @@ public class DeviceProfile {
         cpuAbiList32 = firstNonBlank(cpuAbiList32, "armeabi-v7a,armeabi");
         socModel = firstNonBlank(socModel, boardPlatform);
         socManufacturer = firstNonBlank(socManufacturer, manufacturer);
+
+        String lowerSocMfg = (socManufacturer != null ? socManufacturer : "").toLowerCase(Locale.US);
+        String lowerPlatform = (boardPlatform != null ? boardPlatform : "").toLowerCase(Locale.US);
+        String lowerHw = (hardware != null ? hardware : "").toLowerCase(Locale.US);
+        boolean isQcom = lowerSocMfg.contains("qualcomm") || lowerHw.contains("qcom")
+            || lowerPlatform.contains("sun") || lowerPlatform.contains("taro")
+            || lowerPlatform.contains("kona") || lowerPlatform.contains("kalama");
+        boolean isGoogleTensor = lowerSocMfg.contains("google") || lowerPlatform.contains("zuma")
+            || lowerPlatform.contains("gs") || lowerPlatform.contains("tensor");
+
+        if (isGoogleTensor) {
+            gpuVendor = firstNonBlank(gpuVendor, "ARM");
+            gpuRenderer = firstNonBlank(gpuRenderer, "Mali-G715-Immortalis MC10");
+            glVersion = firstNonBlank(glVersion, "OpenGL ES 3.2 v1.r44p0-01eac0");
+            glslVersion = firstNonBlank(glslVersion, "OpenGL ES GLSL ES 3.20");
+            vulkanVersion = firstNonBlank(vulkanVersion, "1.3.268");
+            vulkanDriverVersion = firstNonBlank(vulkanDriverVersion, "44.0.0");
+            vulkanLevel = vulkanLevel > 0 ? vulkanLevel : 1;
+            cpuHardware = firstNonBlank(cpuHardware, "Google Tensor G3");
+            cpuCores = cpuCores > 0 ? cpuCores : 9;
+        } else if (isQcom) {
+            gpuVendor = firstNonBlank(gpuVendor, "Qualcomm");
+            gpuRenderer = firstNonBlank(gpuRenderer, "Adreno (TM) 830");
+            glVersion = firstNonBlank(glVersion, "OpenGL ES 3.2 V@0797.0 (GIT@e7ff6ef885, I677ff0eb96, 1729000109) (Date:10/15/24)");
+            glslVersion = firstNonBlank(glslVersion, "OpenGL ES GLSL ES 3.20");
+            vulkanVersion = firstNonBlank(vulkanVersion, "1.3.296");
+            vulkanDriverVersion = firstNonBlank(vulkanDriverVersion, "512.797.0");
+            vulkanLevel = vulkanLevel > 0 ? vulkanLevel : 1;
+            cpuHardware = firstNonBlank(cpuHardware, "Qualcomm Technologies, Inc SM8750");
+            cpuCores = cpuCores > 0 ? cpuCores : 8;
+        } else {
+            gpuVendor = firstNonBlank(gpuVendor, "Qualcomm");
+            gpuRenderer = firstNonBlank(gpuRenderer, "Adreno (TM) 830");
+            glVersion = firstNonBlank(glVersion, "OpenGL ES 3.2");
+            glslVersion = firstNonBlank(glslVersion, "OpenGL ES GLSL ES 3.20");
+            vulkanVersion = firstNonBlank(vulkanVersion, "1.3");
+            vulkanDriverVersion = firstNonBlank(vulkanDriverVersion, "512.797.0");
+            vulkanLevel = vulkanLevel > 0 ? vulkanLevel : 1;
+            cpuHardware = firstNonBlank(cpuHardware, "Qualcomm Technologies, Inc");
+            cpuCores = cpuCores > 0 ? cpuCores : 8;
+        }
     }
 
     public boolean matchesPreset(DeviceProfile other) {
@@ -344,4 +403,22 @@ public class DeviceProfile {
     public void setGnssModel(String gnssModel) { this.gnssModel = gnssModel; }
     public int getGnssYear() { return gnssYear; }
     public void setGnssYear(int gnssYear) { this.gnssYear = gnssYear; }
+    public String getGpuVendor() { return gpuVendor; }
+    public void setGpuVendor(String gpuVendor) { this.gpuVendor = gpuVendor; }
+    public String getGpuRenderer() { return gpuRenderer; }
+    public void setGpuRenderer(String gpuRenderer) { this.gpuRenderer = gpuRenderer; }
+    public String getGlVersion() { return glVersion; }
+    public void setGlVersion(String glVersion) { this.glVersion = glVersion; }
+    public String getGlslVersion() { return glslVersion; }
+    public void setGlslVersion(String glslVersion) { this.glslVersion = glslVersion; }
+    public String getVulkanVersion() { return vulkanVersion; }
+    public void setVulkanVersion(String vulkanVersion) { this.vulkanVersion = vulkanVersion; }
+    public String getVulkanDriverVersion() { return vulkanDriverVersion; }
+    public void setVulkanDriverVersion(String vulkanDriverVersion) { this.vulkanDriverVersion = vulkanDriverVersion; }
+    public int getVulkanLevel() { return vulkanLevel; }
+    public void setVulkanLevel(int vulkanLevel) { this.vulkanLevel = vulkanLevel; }
+    public String getCpuHardware() { return cpuHardware; }
+    public void setCpuHardware(String cpuHardware) { this.cpuHardware = cpuHardware; }
+    public int getCpuCores() { return cpuCores; }
+    public void setCpuCores(int cpuCores) { this.cpuCores = cpuCores; }
 }

@@ -41,6 +41,15 @@
     "buildDateUtc": "1735689600",
     "buildDate": "Wed Jan 1 00:00:00 UTC 2025",
     "gnssModel": "Qualcomm GNSS",
-    "gnssYear": 2025
+    "gnssYear": 2025,
+    "gpuVendor": "Qualcomm",
+    "gpuRenderer": "Adreno (TM) 830",
+    "glVersion": "OpenGL ES 3.2 V@0797.0 (GIT@e7ff6ef885, I677ff0eb96, 1729000109) (Date:10/15/24)",
+    "glslVersion": "OpenGL ES GLSL ES 3.20",
+    "vulkanVersion": "1.3.296",
+    "vulkanDriverVersion": "512.797.0",
+    "vulkanLevel": 1,
+    "cpuHardware": "Qualcomm Technologies, Inc SM8750",
+    "cpuCores": 8
   }
 }

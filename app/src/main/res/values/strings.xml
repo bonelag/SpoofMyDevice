@@ -206,6 +206,15 @@
     <string name="settings_field_user_agent">WebView User-Agent</string>
     <string name="settings_field_sim_operator_name">SIM operator name</string>
     <string name="settings_field_sim_operator_numeric">SIM operator numeric</string>
+    <string name="settings_field_gpu_vendor">GPU vendor</string>
+    <string name="settings_field_gpu_renderer">GPU renderer</string>
+    <string name="settings_field_gl_version">OpenGL ES version</string>
+    <string name="settings_field_glsl_version">GLSL version</string>
+    <string name="settings_field_vulkan_version">Vulkan version</string>
+    <string name="settings_field_vulkan_driver_version">Vulkan driver version</string>
+    <string name="settings_field_vulkan_level">Vulkan level</string>
+    <string name="settings_field_cpu_hardware">CPU hardware</string>
+    <string name="settings_field_cpu_cores">CPU cores</string>
     <string name="settings_custom_summary">Custom editing based on %1$s - %2$s</string>
     <string name="settings_preset_summary">%1$s - %2$s</string>
     <string name="settings_app_info_title">App Info</string>

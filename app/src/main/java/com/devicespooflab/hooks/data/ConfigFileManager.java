@@ -241,6 +241,23 @@ public class ConfigFileManager {
         append(builder, "ro.hardware.gps", profile.getGnssModel());
         append(builder, "device.gnss_model", profile.getGnssModel());
         append(builder, "device.gnss_year", profile.getGnssYear() > 0 ? String.valueOf(profile.getGnssYear()) : "");
+
+        builder.append("\n# GPU and Graphics Stack\n");
+        append(builder, "gpu.vendor", profile.getGpuVendor());
+        append(builder, "gpu.renderer", profile.getGpuRenderer());
+        append(builder, "gl.version", profile.getGlVersion());
+        append(builder, "gl.sl_version", profile.getGlslVersion());
+        append(builder, "vulkan.version", profile.getVulkanVersion());
+        append(builder, "vulkan.driver_version", profile.getVulkanDriverVersion());
+        append(builder, "vulkan.level", String.valueOf(profile.getVulkanLevel()));
+        append(builder, "cpu.hardware", profile.getCpuHardware());
+        append(builder, "cpu.cores", String.valueOf(profile.getCpuCores()));
+        append(builder, "vendor.gpu.model", profile.getGpuRenderer());
+        append(builder, "ro.opengles.version", "196610");
+        append(builder, "ro.cpuvulkan.version", "4206592");
+        append(builder, "ro.chipname", profile.getBoardPlatform());
+        append(builder, "ro.hardware.chipname", profile.getBoardPlatform());
+
         append(builder, "screen.width", String.valueOf(profile.getScreenWidth()));
         append(builder, "screen.height", String.valueOf(profile.getScreenHeight()));
         append(builder, "screen.density", String.valueOf(profile.getScreenDensity()));
@@ -342,6 +359,15 @@ public class ConfigFileManager {
         apply(profile::setBuildDateUtc, properties.get("ro.build.date.utc"));
         apply(profile::setGnssModel, firstNonBlank(properties.get("device.gnss_model"), properties.get("ro.hardware.gps")));
         profile.setGnssYear(parseInt(properties.get("device.gnss_year"), profile.getGnssYear()));
+        apply(profile::setGpuVendor, properties.get("gpu.vendor"));
+        apply(profile::setGpuRenderer, firstNonBlank(properties.get("gpu.renderer"), properties.get("vendor.gpu.model")));
+        apply(profile::setGlVersion, properties.get("gl.version"));
+        apply(profile::setGlslVersion, properties.get("gl.sl_version"));
+        apply(profile::setVulkanVersion, properties.get("vulkan.version"));
+        apply(profile::setVulkanDriverVersion, properties.get("vulkan.driver_version"));
+        profile.setVulkanLevel(parseInt(properties.get("vulkan.level"), profile.getVulkanLevel()));
+        apply(profile::setCpuHardware, properties.get("cpu.hardware"));
+        profile.setCpuCores(parseInt(properties.get("cpu.cores"), profile.getCpuCores()));
         return profile;
     }
 
@@ -546,7 +572,21 @@ public class ConfigFileManager {
             "ro.boot.baseband",
             "ro.hardware.gps",
             "device.gnss_model",
-            "device.gnss_year"
+            "device.gnss_year",
+            "gpu.vendor",
+            "gpu.renderer",
+            "gl.version",
+            "gl.sl_version",
+            "vulkan.version",
+            "vulkan.driver_version",
+            "vulkan.level",
+            "cpu.hardware",
+            "cpu.cores",
+            "vendor.gpu.model",
+            "ro.opengles.version",
+            "ro.cpuvulkan.version",
+            "ro.chipname",
+            "ro.hardware.chipname"
         ));
         return keys;
     }

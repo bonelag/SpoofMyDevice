@@ -41,6 +41,15 @@
     "buildDateUtc": "1741132800",
     "buildDate": "Wed Mar 5 00:00:00 UTC 2025",
     "gnssModel": "BCM47765",
-    "gnssYear": 2022
+    "gnssYear": 2022,
+    "gpuVendor": "ARM",
+    "gpuRenderer": "Mali-G710 MP7",
+    "glVersion": "OpenGL ES 3.2 v1.r38p1-01eac0",
+    "glslVersion": "OpenGL ES GLSL ES 3.20",
+    "vulkanVersion": "1.3.238",
+    "vulkanDriverVersion": "38.1.0",
+    "vulkanLevel": 1,
+    "cpuHardware": "Google Tensor G2",
+    "cpuCores": 8
   }
 }
