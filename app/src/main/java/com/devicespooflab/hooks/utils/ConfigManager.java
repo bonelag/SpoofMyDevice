@@ -18,11 +18,14 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -87,6 +90,9 @@ public class ConfigManager {
     public static final String FIELD_GSF_ID = "gsf_id";
     public static final String FIELD_MEDIA_DRM_ID = "media_drm_id";
     public static final String FIELD_APP_SET_ID = "app_set_id";
+    public static final String FIELD_BASEBAND = "baseband";
+    public static final String FIELD_BUILD_USER = "build_user";
+    public static final String FIELD_BUILD_HOST = "build_host";
 
     private static final long RETRY_INTERVAL_MS = 1500L;
 
@@ -690,7 +696,31 @@ public class ConfigManager {
             return defaultValue;
         }
         String value = getConfigValue(key);
-        return (value != null) ? value : defaultValue;
+        if (value != null) {
+            return value;
+        }
+        if (key.equals("gsm.version.baseband") || key.equals("gsm.version.baseband1") || key.equals("gsm.version.baseband2")) {
+            return getBaseband();
+        }
+        if (key.equals("ro.baseband") || key.equals("ro.boot.baseband")) {
+            return getBasebandType();
+        }
+        if (key.equals("ro.build.user")) {
+            return getBuildUser();
+        }
+        if (key.equals("ro.build.host")) {
+            return getBuildHost();
+        }
+        if (key.equals("ro.build.date.utc")) {
+            return String.valueOf(getBuildTime() / 1000L);
+        }
+        if (key.equals("ro.build.date")) {
+            return formatBuildDate(getBuildTime());
+        }
+        if (key.equals("ro.hardware.gps") || key.equals("ro.boot.hardware.gps")) {
+            return getGnssHardwareModelName();
+        }
+        return defaultValue;
     }
 
     public static Map<String, String> getEffectiveSystemProperties() {
@@ -709,6 +739,27 @@ public class ConfigManager {
                 continue;
             }
             result.put(key, entry.getValue() == null ? "" : entry.getValue());
+        }
+        if (!result.containsKey("gsm.version.baseband")) {
+            result.put("gsm.version.baseband", getBaseband());
+        }
+        if (!result.containsKey("ro.baseband")) {
+            result.put("ro.baseband", getBasebandType());
+        }
+        if (!result.containsKey("ro.build.user")) {
+            result.put("ro.build.user", getBuildUser());
+        }
+        if (!result.containsKey("ro.build.host")) {
+            result.put("ro.build.host", getBuildHost());
+        }
+        if (!result.containsKey("ro.build.date.utc")) {
+            result.put("ro.build.date.utc", String.valueOf(getBuildTime() / 1000L));
+        }
+        if (!result.containsKey("ro.build.date")) {
+            result.put("ro.build.date", formatBuildDate(getBuildTime()));
+        }
+        if (!result.containsKey("ro.hardware.gps")) {
+            result.put("ro.hardware.gps", getGnssHardwareModelName());
         }
         return result;
     }
@@ -944,6 +995,15 @@ public class ConfigManager {
             || key.equals("ro.product.locale.region")) {
             return FIELD_LOCALE;
         }
+        if (key.equals("gsm.version.baseband") || key.equals("ro.baseband")) {
+            return FIELD_BASEBAND;
+        }
+        if (key.equals("ro.build.user")) {
+            return FIELD_BUILD_USER;
+        }
+        if (key.equals("ro.build.host")) {
+            return FIELD_BUILD_HOST;
+        }
         return null;
     }
 
@@ -1146,6 +1206,166 @@ public class ConfigManager {
 
     public static String getCpuAbiList32() {
         return getConfigValue("ro.product.cpu.abilist32");
+    }
+
+    public static String getBaseband() {
+        if (!isSpoofEnabled(FIELD_BASEBAND)) {
+            return null;
+        }
+        String baseband = getFirstOptionalConfigValue("gsm.version.baseband", "device.baseband");
+        if (baseband != null) {
+            return baseband;
+        }
+        String brand = getBuildBrand();
+        String board = getBuildBoard();
+        String hardware = getBuildHardware();
+        String incremental = getBuildVersionIncremental();
+        if (incremental == null) {
+            incremental = "001";
+        }
+
+        String lowerBrand = brand != null ? brand.toLowerCase(Locale.US) : "";
+        String lowerBoard = board != null ? board.toLowerCase(Locale.US) : "";
+        String lowerHw = hardware != null ? hardware.toLowerCase(Locale.US) : "";
+
+        boolean isQualcomm = lowerBoard.contains("sun") || lowerBoard.contains("kalama")
+            || lowerBoard.contains("taro") || lowerBoard.contains("lahaina")
+            || lowerHw.contains("qcom") || lowerHw.contains("qualcomm");
+
+        if (lowerBrand.contains("xiaomi")) {
+            if (isQualcomm) {
+                return "MPSS.DE.1.0-" + incremental + "-SUN_GEN_PACK-1";
+            }
+            return "MPSS.DE.1.0-" + incremental;
+        } else if (lowerBrand.contains("samsung")) {
+            String model = getBuildModel();
+            return (model != null ? model : "S938B") + "XXU1AXL3";
+        } else if (lowerBrand.contains("google")) {
+            return "g5300g-240913-241021-B-12543976";
+        } else if (isQualcomm) {
+            return "MPSS.DE.1.0-" + incremental;
+        }
+        return "MPSS.DE.1.0-" + incremental;
+    }
+
+    public static String getBasebandType() {
+        String basebandType = getFirstOptionalConfigValue("ro.baseband", "ro.boot.baseband");
+        if (basebandType != null) {
+            return basebandType;
+        }
+        String board = getBuildBoard();
+        String hw = getBuildHardware();
+        String lowerBoard = board != null ? board.toLowerCase(Locale.US) : "";
+        String lowerHw = hw != null ? hw.toLowerCase(Locale.US) : "";
+        if (lowerBoard.contains("sun") || lowerHw.contains("qcom") || lowerHw.contains("qualcomm")) {
+            return "qcom";
+        }
+        return "qcom";
+    }
+
+    public static String getBuildUser() {
+        String user = getFirstOptionalConfigValue("ro.build.user", "device.build_user");
+        if (user != null) {
+            return user;
+        }
+        String brand = getBuildBrand();
+        if (brand != null) {
+            String lower = brand.toLowerCase(Locale.US);
+            if (lower.contains("xiaomi") || lower.contains("redmi") || lower.contains("poco")) {
+                return "builder";
+            }
+            if (lower.contains("google")) {
+                return "android-build";
+            }
+            if (lower.contains("samsung")) {
+                return "dpi";
+            }
+        }
+        return "android-build";
+    }
+
+    public static String getBuildHost() {
+        String host = getFirstOptionalConfigValue("ro.build.host", "device.build_host");
+        if (host != null) {
+            return host;
+        }
+        String brand = getBuildBrand();
+        if (brand != null) {
+            String lower = brand.toLowerCase(Locale.US);
+            if (lower.contains("xiaomi") || lower.contains("redmi") || lower.contains("poco")) {
+                return "c5-miui-ota-bd128.bj";
+            }
+            if (lower.contains("google")) {
+                return "google.com";
+            }
+            if (lower.contains("samsung")) {
+                return "SWDD5712";
+            }
+        }
+        return "buildhost.local";
+    }
+
+    public static long getBuildTime() {
+        String utcStr = getFirstOptionalConfigValue("ro.build.date.utc", "device.build_time");
+        if (utcStr != null) {
+            try {
+                long parsed = Long.parseLong(utcStr);
+                return parsed < 10000000000L ? parsed * 1000L : parsed;
+            } catch (Throwable ignored) {
+            }
+        }
+        String patch = getBuildVersionSecurityPatch();
+        if (patch != null && patch.length() >= 10) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date date = sdf.parse(patch);
+                if (date != null) {
+                    return date.getTime() + 12L * 3600L * 1000L;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return 1735689600000L;
+    }
+
+    public static String formatBuildDate(long timeMs) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d HH:mm:ss z yyyy", Locale.US);
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return sdf.format(new Date(timeMs));
+        } catch (Throwable ignored) {
+            return "Wed Jan 1 12:00:00 UTC 2025";
+        }
+    }
+
+    public static String getGnssHardwareModelName() {
+        String gnss = getFirstOptionalConfigValue("ro.hardware.gps", "device.gnss_model");
+        if (gnss != null) {
+            return gnss;
+        }
+        return "Qualcomm GNSS";
+    }
+
+    public static int getGnssYearOfHardware() {
+        String yearStr = getOptionalConfigValue("device.gnss_year");
+        if (yearStr != null) {
+            int year = parseInt(yearStr, 0);
+            if (year > 0) {
+                return year;
+            }
+        }
+        String patch = getBuildVersionSecurityPatch();
+        if (patch != null && patch.length() >= 4) {
+            try {
+                int y = Integer.parseInt(patch.substring(0, 4));
+                if (y >= 2018 && y <= 2030) {
+                    return y;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return 2025;
     }
 
     private static int parseInt(String value, int fallback) {

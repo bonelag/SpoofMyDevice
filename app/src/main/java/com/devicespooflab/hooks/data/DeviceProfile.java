@@ -44,6 +44,13 @@ public class DeviceProfile {
     private String cpuAbiList32;
     private String socModel;
     private String socManufacturer;
+    private String baseband;
+    private String buildUser;
+    private String buildHost;
+    private String buildDateUtc;
+    private String buildDate;
+    private String gnssModel;
+    private int gnssYear;
 
     public DeviceProfile() {
     }
@@ -88,6 +95,13 @@ public class DeviceProfile {
         this.cpuAbiList32 = other.cpuAbiList32;
         this.socModel = other.socModel;
         this.socManufacturer = other.socManufacturer;
+        this.baseband = other.baseband;
+        this.buildUser = other.buildUser;
+        this.buildHost = other.buildHost;
+        this.buildDateUtc = other.buildDateUtc;
+        this.buildDate = other.buildDate;
+        this.gnssModel = other.gnssModel;
+        this.gnssYear = other.gnssYear;
     }
 
     public DeviceProfile copy() {
@@ -316,4 +330,18 @@ public class DeviceProfile {
     public void setSocModel(String socModel) { this.socModel = socModel; }
     public String getSocManufacturer() { return socManufacturer; }
     public void setSocManufacturer(String socManufacturer) { this.socManufacturer = socManufacturer; }
+    public String getBaseband() { return baseband; }
+    public void setBaseband(String baseband) { this.baseband = baseband; }
+    public String getBuildUser() { return buildUser; }
+    public void setBuildUser(String buildUser) { this.buildUser = buildUser; }
+    public String getBuildHost() { return buildHost; }
+    public void setBuildHost(String buildHost) { this.buildHost = buildHost; }
+    public String getBuildDateUtc() { return buildDateUtc; }
+    public void setBuildDateUtc(String buildDateUtc) { this.buildDateUtc = buildDateUtc; }
+    public String getBuildDate() { return buildDate; }
+    public void setBuildDate(String buildDate) { this.buildDate = buildDate; }
+    public String getGnssModel() { return gnssModel; }
+    public void setGnssModel(String gnssModel) { this.gnssModel = gnssModel; }
+    public int getGnssYear() { return gnssYear; }
+    public void setGnssYear(int gnssYear) { this.gnssYear = gnssYear; }
 }

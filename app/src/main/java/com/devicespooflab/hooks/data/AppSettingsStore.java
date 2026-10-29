@@ -23,7 +23,7 @@ public final class AppSettingsStore {
     public static final String COLOR_STYLE_BLUE = "blue";
     public static final String COLOR_STYLE_ROSE = "rose";
     public static final String COLOR_STYLE_AMBER = "amber";
-    public static final String DEFAULT_PRESET_SOURCE_URL = "https://github.com/BuSung-dev/SpoofMyDevice_Devices.git";
+    public static final String DEFAULT_PRESET_SOURCE_URL = "https://github.com/bonelag/SpoofMyDevice";
 
     private static final String PREFS_NAME = "app_settings";
     private static final String KEY_THEME_MODE = "theme_mode";

@@ -23,6 +23,7 @@ public class BuildHooks {
     private static final Map<String, Object> ORIGINAL_BUILD_FIELDS = new HashMap<>();
     private static final Map<String, Object> ORIGINAL_VERSION_FIELDS = new HashMap<>();
     private static boolean serialHookInstalled;
+    private static boolean radioHookInstalled;
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         reapply(lpparam.classLoader, lpparam.packageName);
@@ -65,8 +66,11 @@ public class BuildHooks {
             if (!serialHookInstalled) {
                 hookGetSerial(buildClass);
             }
+            if (!radioHookInstalled) {
+                hookGetRadioVersion(buildClass);
+            }
 
-            XposedBridge.log(TAG + ": Build fields and getSerial hooked");
+            XposedBridge.log(TAG + ": Build fields, getSerial, and getRadioVersion hooked");
         } catch (Throwable throwable) {
             XposedBridge.log(TAG + ": Failed to hook Build methods: " + throwable.getMessage());
         }
@@ -108,6 +112,11 @@ public class BuildHooks {
         if (abi32.length > 0) {
             setStaticString(buildClass, "CPU_ABI2", abi32.length > 1 ? abi32[1] : abi32[0]);
         }
+
+        setStaticString(buildClass, "USER", ConfigManager.getBuildUser());
+        setStaticString(buildClass, "HOST", ConfigManager.getBuildHost());
+        setStaticLong(buildClass, "TIME", ConfigManager.getBuildTime());
+        setStaticString(buildClass, "RADIO", ConfigManager.getBaseband());
     }
 
     private static void applyVersionFields(Class<?> versionClass) {
@@ -140,6 +149,10 @@ public class BuildHooks {
         captureField(buildClass, "SUPPORTED_32_BIT_ABIS", ORIGINAL_BUILD_FIELDS);
         captureField(buildClass, "CPU_ABI", ORIGINAL_BUILD_FIELDS);
         captureField(buildClass, "CPU_ABI2", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "USER", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "HOST", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "TIME", ORIGINAL_BUILD_FIELDS);
+        captureField(buildClass, "RADIO", ORIGINAL_BUILD_FIELDS);
     }
 
     private static void captureOriginalVersionFields(Class<?> versionClass) {
@@ -172,6 +185,10 @@ public class BuildHooks {
         restoreField(buildClass, "SUPPORTED_32_BIT_ABIS", ORIGINAL_BUILD_FIELDS);
         restoreField(buildClass, "CPU_ABI", ORIGINAL_BUILD_FIELDS);
         restoreField(buildClass, "CPU_ABI2", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "USER", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "HOST", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "TIME", ORIGINAL_BUILD_FIELDS);
+        restoreField(buildClass, "RADIO", ORIGINAL_BUILD_FIELDS);
     }
 
     private static void restoreVersionFields(Class<?> versionClass) {
@@ -219,6 +236,8 @@ public class BuildHooks {
         try {
             if (field.getType() == Integer.TYPE) {
                 bucket.put(fieldName, XposedHelpers.getStaticIntField(targetClass, fieldName));
+            } else if (field.getType() == Long.TYPE) {
+                bucket.put(fieldName, XposedHelpers.getStaticLongField(targetClass, fieldName));
             } else {
                 bucket.put(fieldName, XposedHelpers.getStaticObjectField(targetClass, fieldName));
             }
@@ -234,6 +253,8 @@ public class BuildHooks {
         try {
             if (field.getType() == Integer.TYPE && bucket.get(fieldName) instanceof Integer) {
                 XposedHelpers.setStaticIntField(targetClass, fieldName, (Integer) bucket.get(fieldName));
+            } else if (field.getType() == Long.TYPE && bucket.get(fieldName) instanceof Long) {
+                XposedHelpers.setStaticLongField(targetClass, fieldName, (Long) bucket.get(fieldName));
             } else {
                 XposedHelpers.setStaticObjectField(targetClass, fieldName, bucket.get(fieldName));
             }
@@ -257,6 +278,25 @@ public class BuildHooks {
         } catch (NoSuchMethodError ignored) {
         } catch (Throwable throwable) {
             XposedBridge.log(TAG + ": Failed to hook getSerial(): " + throwable.getMessage());
+        }
+    }
+
+    private static void hookGetRadioVersion(Class<?> buildClass) {
+        try {
+            XposedHelpers.findAndHookMethod(buildClass, "getRadioVersion",
+                new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) {
+                        String spoofedValue = ConfigManager.getBaseband();
+                        if (spoofedValue != null && !spoofedValue.isEmpty()) {
+                            param.setResult(spoofedValue);
+                        }
+                    }
+                });
+            radioHookInstalled = true;
+        } catch (NoSuchMethodError ignored) {
+        } catch (Throwable throwable) {
+            XposedBridge.log(TAG + ": Failed to hook getRadioVersion(): " + throwable.getMessage());
         }
     }
 
@@ -292,6 +332,17 @@ public class BuildHooks {
         }
         try {
             XposedHelpers.setStaticIntField(targetClass, fieldName, value);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void setStaticLong(Class<?> targetClass, String fieldName, long value) {
+        Field field = XposedHelpers.findFieldIfExists(targetClass, fieldName);
+        if (field == null) {
+            return;
+        }
+        try {
+            XposedHelpers.setStaticLongField(targetClass, fieldName, value);
         } catch (Throwable ignored) {
         }
     }

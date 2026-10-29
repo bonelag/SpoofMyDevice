@@ -162,6 +162,10 @@ public class ConfigFileManager {
         append(builder, "ro.build.device", profile.getDeviceCode());
         append(builder, "ro.build.characteristics", profile.getBuildCharacteristics());
         append(builder, "ro.build.flavor", profile.getBuildFlavor());
+        append(builder, "ro.build.user", profile.getBuildUser());
+        append(builder, "ro.build.host", profile.getBuildHost());
+        append(builder, "ro.build.date", profile.getBuildDate());
+        append(builder, "ro.build.date.utc", profile.getBuildDateUtc());
         append(builder, "ro.build.version.release", profile.getBuildRelease());
         append(builder, "ro.build.version.release_or_codename", profile.getBuildRelease());
         append(builder, "ro.build.version.release_or_preview_display", profile.getBuildRelease());
@@ -229,6 +233,9 @@ public class ConfigFileManager {
         append(builder, "ro.hardware.egl", graphicsStack(profile));
         append(builder, "ro.soc.model", profile.getSocModel());
         append(builder, "ro.soc.manufacturer", profile.getSocManufacturer());
+        append(builder, "ro.hardware.gps", profile.getGnssModel());
+        append(builder, "device.gnss_model", profile.getGnssModel());
+        append(builder, "device.gnss_year", profile.getGnssYear() > 0 ? String.valueOf(profile.getGnssYear()) : "");
         append(builder, "screen.width", String.valueOf(profile.getScreenWidth()));
         append(builder, "screen.height", String.valueOf(profile.getScreenHeight()));
         append(builder, "screen.density", String.valueOf(profile.getScreenDensity()));
@@ -244,6 +251,9 @@ public class ConfigFileManager {
         append(builder, "ro.boot.serialno", nullable(profile.getSerialNumber()));
         append(builder, "ro.bootloader", nullable(profile.getBootloader()));
         append(builder, "ANDROID_ID", nullable(profile.getAndroidId()));
+        append(builder, "gsm.version.baseband", nullable(profile.getBaseband()));
+        append(builder, "ro.baseband", isQualcomm(profile) ? "qcom" : "unknown");
+        append(builder, "ro.boot.baseband", isQualcomm(profile) ? "qcom" : "unknown");
 
         builder.append("\n# Carrier\n");
         append(builder, "gsm.operator.alpha", profile.getOperatorAlpha());
@@ -320,7 +330,24 @@ public class ConfigFileManager {
         apply(profile::setCpuAbiList32, properties.get("ro.product.cpu.abilist32"));
         apply(profile::setSocModel, properties.get("ro.soc.model"));
         apply(profile::setSocManufacturer, properties.get("ro.soc.manufacturer"));
+        apply(profile::setBaseband, properties.get("gsm.version.baseband"));
+        apply(profile::setBuildUser, properties.get("ro.build.user"));
+        apply(profile::setBuildHost, properties.get("ro.build.host"));
+        apply(profile::setBuildDate, properties.get("ro.build.date"));
+        apply(profile::setBuildDateUtc, properties.get("ro.build.date.utc"));
+        apply(profile::setGnssModel, firstNonBlank(properties.get("device.gnss_model"), properties.get("ro.hardware.gps")));
+        profile.setGnssYear(parseInt(properties.get("device.gnss_year"), profile.getGnssYear()));
         return profile;
+    }
+
+    private boolean isQualcomm(DeviceProfile profile) {
+        String hardware = nullable(profile.getHardware()).toLowerCase(Locale.US);
+        String platform = nullable(profile.getBoardPlatform()).toLowerCase(Locale.US);
+        String board = nullable(profile.getBoard()).toLowerCase(Locale.US);
+        return hardware.contains("qcom") || hardware.contains("qualcomm")
+            || platform.contains("sun") || platform.contains("kalama")
+            || platform.contains("taro") || platform.contains("lahaina")
+            || board.contains("sun") || board.contains("kona");
     }
 
     private DeviceProfile findPresetProfile(List<DevicePreset> presets, String presetId) {
@@ -504,7 +531,17 @@ public class ConfigFileManager {
             "ro.product.locale.language",
             "ro.product.locale.region",
             "persist.sys.usb.config",
-            "webview.user_agent"
+            "webview.user_agent",
+            "ro.build.user",
+            "ro.build.host",
+            "ro.build.date",
+            "ro.build.date.utc",
+            "gsm.version.baseband",
+            "ro.baseband",
+            "ro.boot.baseband",
+            "ro.hardware.gps",
+            "device.gnss_model",
+            "device.gnss_year"
         ));
         return keys;
     }

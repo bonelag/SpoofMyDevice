@@ -10,6 +10,7 @@ basic-check/
 .gradle/
 local.properties
 jadx_out
+jadx_hw
 # IDE
 .idea/
 *.iml

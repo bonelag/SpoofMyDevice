@@ -21,8 +21,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 
 public class DevicePresetCatalog {
@@ -175,29 +177,61 @@ public class DevicePresetCatalog {
 
     private JSONArray fetchRemotePresetArray(String sourceUrl) throws Exception {
         String apiUrl = toGithubContentsApiUrl(sourceUrl);
-        JSONArray contents = new JSONArray(readUrl(apiUrl));
         JSONArray normalizedArray = new JSONArray();
+        Set<String> seenIds = new HashSet<>();
 
-        for (int index = 0; index < contents.length(); index++) {
-            JSONObject item = contents.getJSONObject(index);
-            if (!"file".equalsIgnoreCase(item.optString("type"))) {
-                continue;
-            }
-            String name = item.optString("name");
-            if (!name.toLowerCase(Locale.US).endsWith(".json")) {
-                continue;
-            }
-
-            String downloadUrl = item.optString("download_url");
-            if (downloadUrl == null || downloadUrl.trim().isEmpty()) {
-                continue;
-            }
-
-            JSONObject sourceJson = new JSONObject(readUrl(downloadUrl));
-            normalizedArray.put(normalizePresetJson(name, sourceJson));
-        }
-
+        readJsonFilesFromApiUrl(apiUrl, normalizedArray, seenIds, true);
         return normalizedArray;
+    }
+
+    private void readJsonFilesFromApiUrl(String apiUrl, JSONArray normalizedArray, Set<String> seenIds, boolean lookForPresetsDir) {
+        try {
+            JSONArray contents = new JSONArray(readUrl(apiUrl));
+            String presetsDirUrl = null;
+
+            for (int index = 0; index < contents.length(); index++) {
+                JSONObject item = contents.getJSONObject(index);
+                String type = item.optString("type");
+                String name = item.optString("name");
+
+                if ("file".equalsIgnoreCase(type) && name.toLowerCase(Locale.US).endsWith(".json")) {
+                    String downloadUrl = item.optString("download_url");
+                    if (downloadUrl != null && !downloadUrl.trim().isEmpty()) {
+                        try {
+                            JSONObject sourceJson = new JSONObject(readUrl(downloadUrl));
+                            JSONObject normalized = normalizePresetJson(name, sourceJson);
+                            String id = normalized.optString("id");
+                            if (seenIds.add(id)) {
+                                normalizedArray.put(normalized);
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                } else if (lookForPresetsDir && "dir".equalsIgnoreCase(type) && "presets".equalsIgnoreCase(name)) {
+                    presetsDirUrl = item.optString("url");
+                }
+            }
+
+            if (lookForPresetsDir) {
+                if (presetsDirUrl != null && !presetsDirUrl.trim().isEmpty()) {
+                    readJsonFilesFromApiUrl(presetsDirUrl, normalizedArray, seenIds, false);
+                } else if (normalizedArray.length() == 0 && !apiUrl.contains("/contents/presets")) {
+                    String fallbackPresetsUrl = buildSubdirApiUrl(apiUrl, "presets");
+                    readJsonFilesFromApiUrl(fallbackPresetsUrl, normalizedArray, seenIds, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private String buildSubdirApiUrl(String baseApiUrl, String subdir) {
+        int queryIndex = baseApiUrl.indexOf('?');
+        if (queryIndex != -1) {
+            String path = baseApiUrl.substring(0, queryIndex);
+            String query = baseApiUrl.substring(queryIndex);
+            return path + "/" + subdir + query;
+        }
+        return baseApiUrl + "/" + subdir;
     }
 
     private JSONObject normalizePresetJson(String fileName, JSONObject sourceJson) throws Exception {
@@ -436,6 +470,13 @@ public class DevicePresetCatalog {
         profile.setCpuAbiList32(jsonObject.optString("cpuAbiList32"));
         profile.setSocModel(jsonObject.optString("socModel"));
         profile.setSocManufacturer(jsonObject.optString("socManufacturer"));
+        profile.setBaseband(jsonObject.optString("baseband"));
+        profile.setBuildUser(jsonObject.optString("buildUser"));
+        profile.setBuildHost(jsonObject.optString("buildHost"));
+        profile.setBuildDateUtc(jsonObject.optString("buildDateUtc"));
+        profile.setBuildDate(jsonObject.optString("buildDate"));
+        profile.setGnssModel(jsonObject.optString("gnssModel"));
+        profile.setGnssYear(jsonObject.optInt("gnssYear", 0));
         return profile;
     }
 }

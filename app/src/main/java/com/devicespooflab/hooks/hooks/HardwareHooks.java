@@ -39,6 +39,7 @@ public class HardwareHooks {
             hookActivityManagerMemory(lpparam);
             hookDebugMemory();
             hookFileReads(); // Hook /proc/cpuinfo and /proc/meminfo reads
+            hookGnssLocation(lpparam);
             XposedBridge.log(TAG + ": Successfully hooked hardware specs");
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook hardware: " + e.getMessage());
@@ -196,6 +197,48 @@ public class HardwareHooks {
                 });
         } catch (Exception e) {
             // Ignore
+        }
+    }
+
+    private static void hookGnssLocation(XC_LoadPackage.LoadPackageParam lpparam) {
+        try {
+            Class<?> locationManagerClass = XposedHelpers.findClassIfExists(
+                "android.location.LocationManager", lpparam.classLoader);
+            if (locationManagerClass == null) {
+                locationManagerClass = XposedHelpers.findClassIfExists("android.location.LocationManager", null);
+            }
+            if (locationManagerClass == null) {
+                return;
+            }
+
+            try {
+                XposedHelpers.findAndHookMethod(locationManagerClass, "getGnssHardwareModelName",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                            String gnssModel = ConfigManager.getGnssHardwareModelName();
+                            if (gnssModel != null) {
+                                param.setResult(gnssModel);
+                            }
+                        }
+                    });
+            } catch (Throwable ignored) {
+            }
+
+            try {
+                XposedHelpers.findAndHookMethod(locationManagerClass, "getGnssYearOfHardware",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                            int year = ConfigManager.getGnssYearOfHardware();
+                            if (year > 0) {
+                                param.setResult(year);
+                            }
+                        }
+                    });
+            } catch (Throwable ignored) {
+            }
+        } catch (Throwable ignored) {
         }
     }
 }

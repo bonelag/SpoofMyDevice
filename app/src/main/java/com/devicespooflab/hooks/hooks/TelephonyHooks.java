@@ -629,6 +629,34 @@ public class TelephonyHooks {
                     });
         } catch (NoSuchMethodError ignored) {
         }
+
+        try {
+            XposedHelpers.findAndHookMethod(telephonyManager, "getRadioVersion",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) {
+                            String spoofedValue = ConfigManager.getBaseband();
+                            if (spoofedValue != null && !spoofedValue.isEmpty()) {
+                                param.setResult(spoofedValue);
+                            }
+                        }
+                    });
+        } catch (NoSuchMethodError ignored) {
+        }
+
+        try {
+            XposedHelpers.findAndHookMethod(telephonyManager, "getBasebandVersionForPhone", int.class,
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) {
+                            String spoofedValue = ConfigManager.getBaseband();
+                            if (spoofedValue != null && !spoofedValue.isEmpty()) {
+                                param.setResult(spoofedValue);
+                            }
+                        }
+                    });
+        } catch (NoSuchMethodError ignored) {
+        }
     }
 
     private static void hookSubscriptionManager(Class<?> subscriptionManager, Class<?> subscriptionInfoClass) {
