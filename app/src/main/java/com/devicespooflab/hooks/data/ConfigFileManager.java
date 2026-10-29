@@ -157,7 +157,12 @@ public class ConfigFileManager {
         append(builder, "ro.build.version.incremental", profile.getBuildIncremental());
         append(builder, "ro.build.type", "user");
         append(builder, "ro.build.tags", "release-keys");
-        append(builder, "ro.build.description", profile.getBuildDescription());
+        String buildDescription = profile.getBuildDescription();
+        if (buildDescription == null || buildDescription.isEmpty() || "user".equals(buildDescription)) {
+            buildDescription = String.format(Locale.US, "%s-user %s %s %s release-keys",
+                profile.getProductName(), profile.getBuildRelease(), profile.getBuildId(), profile.getBuildIncremental());
+        }
+        append(builder, "ro.build.description", buildDescription);
         append(builder, "ro.build.product", profile.getBuildProduct());
         append(builder, "ro.build.device", profile.getDeviceCode());
         append(builder, "ro.build.characteristics", profile.getBuildCharacteristics());

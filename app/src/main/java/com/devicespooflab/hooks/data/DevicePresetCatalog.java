@@ -121,8 +121,13 @@ public class DevicePresetCatalog {
         profile.setBuildIncremental(Build.VERSION.INCREMENTAL);
         profile.setBuildRelease(Build.VERSION.RELEASE);
         profile.setBuildSdk(Build.VERSION.SDK_INT);
-        profile.setBuildDescription(Build.TYPE);
-        profile.setBuildFlavor(Build.TYPE);
+        String realDescription = readSystemProperty("ro.build.description");
+        if (realDescription.isEmpty()) {
+            realDescription = String.format(Locale.US, "%s-%s %s %s %s %s",
+                Build.PRODUCT, Build.TYPE, Build.VERSION.RELEASE, Build.ID, Build.VERSION.INCREMENTAL, Build.TAGS);
+        }
+        profile.setBuildDescription(realDescription);
+        profile.setBuildFlavor(Build.PRODUCT + "-" + Build.TYPE);
         profile.setBuildProduct(Build.PRODUCT);
         profile.setBuildCharacteristics(isTablet(metrics) ? "tablet" : "nosdcard");
         profile.setScreenWidth(metrics.widthPixels);
@@ -409,6 +414,16 @@ public class DevicePresetCatalog {
     private String readBuildField(String fieldName) {
         try {
             Object value = Build.class.getField(fieldName).get(null);
+            return value instanceof String ? (String) value : "";
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private String readSystemProperty(String key) {
+        try {
+            Class<?> clazz = Class.forName("android.os.SystemProperties");
+            Object value = clazz.getMethod("get", String.class, String.class).invoke(null, key, "");
             return value instanceof String ? (String) value : "";
         } catch (Throwable ignored) {
             return "";
