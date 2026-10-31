@@ -56,7 +56,15 @@ public class MainHook implements IXposedHookLoadPackage {
         if (packageName == null || packageName.isEmpty()) {
             return true;
         }
+        try {
+            if (android.os.Process.myUid() < 10000) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
         if ("android".equals(packageName)
+            || "system".equals(packageName)
+            || "system_server".equals(packageName)
             || "com.android.systemui".equals(packageName)
             || packageName.startsWith("org.lsposed.")
             || packageName.startsWith("me.weishu.kernelsu")

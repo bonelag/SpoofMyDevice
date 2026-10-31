@@ -315,7 +315,13 @@ public class ConfigManager {
 
     public static boolean isSystemPackage(String packageName) {
         if (packageName == null || packageName.isEmpty()) return true;
+        try {
+            if (android.os.Process.myUid() < 10000) return true;
+        } catch (Throwable ignored) {
+        }
         return packageName.equals("android")
+            || packageName.equals("system")
+            || packageName.equals("system_server")
             || packageName.equals("com.android.systemui")
             || packageName.contains(".launcher")
             || packageName.startsWith("com.bbk.launcher")
