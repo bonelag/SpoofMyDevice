@@ -1828,46 +1828,89 @@ public class ConfigManager {
             || board.contains("cubs") || board.contains("stallion") || platform.contains("malibu") || platform.contains("laguna");
     }
 
+    private static File appCpuInfoFile = null;
+
+    public static void setAppCpuInfoFile(File file) {
+        appCpuInfoFile = file;
+    }
+
+    public static String getCacheL3Size() {
+        String model = getSocModel().toLowerCase(Locale.US);
+        if (model.contains("elite") || model.contains("sm8750")) {
+            return "16384K";
+        }
+        if (model.contains("tensor g6") || isTensorG6Device()) {
+            return "16384K";
+        }
+        if (model.contains("tensor g5")) {
+            return "12288K";
+        }
+        if (model.contains("tensor")) {
+            return "8192K";
+        }
+        if (model.contains("gen 1") || model.contains("sm8450")) {
+            return "6144K";
+        }
+        return "16384K";
+    }
+
+    public static String getCpuMaxFreq() {
+        String model = getSocModel().toLowerCase(Locale.US);
+        if (model.contains("elite") || model.contains("sm8750")) {
+            return "4320000";
+        }
+        if (model.contains("tensor g6") || isTensorG6Device()) {
+            return "4110000";
+        }
+        if (model.contains("tensor g5")) {
+            return "3400000";
+        }
+        if (model.contains("tensor g4")) {
+            return "3100000";
+        }
+        if (model.contains("tensor g3")) {
+            return "2910000";
+        }
+        if (model.contains("tensor g2")) {
+            return "2850000";
+        }
+        return "3200000";
+    }
+
+    public static String getCpuMinFreq() {
+        return "300000";
+    }
+
+    public static String getCpuInfoContent() {
+        int cores = getCpuCores();
+        String cpuHw = getCpuHardware();
+        boolean isTensor = isGoogleTensorDevice();
+        String implementer = isTensor ? "0x41" : "0x51";
+        String part = isTensor ? "0xd46" : "0x001";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cores; i++) {
+            sb.append("processor\t: ").append(i).append("\n");
+            sb.append("BogoMIPS\t: ").append(isTensor ? "26.00" : "38.40").append("\n");
+            sb.append("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 sve sve2\n");
+            sb.append("CPU implementer\t: ").append(implementer).append("\n");
+            sb.append("CPU architecture: 8\n");
+            sb.append("CPU variant\t: 0x0\n");
+            sb.append("CPU part\t: ").append(part).append("\n");
+            sb.append("CPU revision\t: 0\n\n");
+        }
+        sb.append("Hardware\t: ").append(cpuHw).append("\n");
+        return sb.toString();
+    }
+
     public static File getCpuInfoFile() {
+        if (appCpuInfoFile != null && appCpuInfoFile.exists()) {
+            return appCpuInfoFile;
+        }
         File file = new File("/data/local/tmp/spoofmydevice/cpuinfo");
         if (file.exists() && file.length() > 0) {
             return file;
         }
-        return ensureCpuInfoFile();
-    }
-
-    public static synchronized File ensureCpuInfoFile() {
-        try {
-            File dir = new File("/data/local/tmp/spoofmydevice");
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            File file = new File(dir, "cpuinfo");
-            int cores = getCpuCores();
-            String cpuHw = getCpuHardware();
-            boolean isTensor = isGoogleTensorDevice();
-            StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < cores; i++) {
-                sb.append("processor\t: ").append(i).append("\n");
-                sb.append("BogoMIPS\t: ").append(isTensor ? "26.00" : "38.40").append("\n");
-                sb.append("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512\n");
-                sb.append("CPU implementer\t: ").append(isTensor ? "0x41" : "0x51").append("\n");
-                sb.append("CPU architecture: 8\n");
-                sb.append("CPU variant\t: 0x0\n");
-                sb.append("CPU part\t: ").append(isTensor ? "0xd46" : "0x001").append("\n");
-                sb.append("CPU revision\t: 0\n\n");
-            }
-            sb.append("Hardware\t: ").append(cpuHw).append("\n");
-
-            java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
-            fos.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-            fos.close();
-            file.setReadable(true, false);
-            return file;
-        } catch (Throwable t) {
-            return null;
-        }
+        return null;
     }
 
     private static int parseInt(String value, int fallback) {

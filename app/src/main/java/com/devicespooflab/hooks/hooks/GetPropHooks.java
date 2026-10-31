@@ -45,7 +45,7 @@ public final class GetPropHooks {
                         }
 
                         List<String> command = readCommand(param.thisObject);
-                        GetPropRequest request = parseRequest(command);
+                        CommandRequest request = parseRequest(command);
                         if (request == null) {
                             return;
                         }
@@ -83,7 +83,7 @@ public final class GetPropHooks {
                     return;
                 }
 
-                GetPropRequest request = null;
+                CommandRequest request = null;
                 Object commandArg = param.args[0];
                 if (commandArg instanceof String) {
                     request = parseShellCommand((String) commandArg);
@@ -120,7 +120,7 @@ public final class GetPropHooks {
         return null;
     }
 
-    private static GetPropRequest parseRequest(List<String> command) {
+    private static CommandRequest parseRequest(List<String> command) {
         if (command == null || command.isEmpty()) {
             return null;
         }
@@ -133,9 +133,33 @@ public final class GetPropHooks {
         String first = leafName(normalized.get(0));
         if ("getprop".equals(first)) {
             if (normalized.size() >= 2) {
-                return new GetPropRequest(false, normalized.get(1));
+                return new CommandRequest(false, normalized.get(1));
             }
-            return new GetPropRequest(true, null);
+            return new CommandRequest(true, null);
+        }
+
+        if ("uname".equals(first)) {
+            boolean hasM = false;
+            boolean hasA = false;
+            for (String arg : normalized) {
+                if (arg.contains("-m")) hasM = true;
+                if (arg.contains("-a")) hasA = true;
+            }
+            String abi = ConfigManager.getCpuAbi();
+            String arch = (abi != null && abi.contains("arm64")) ? "aarch64" : "armv7l";
+            if (hasM) {
+                return new CommandRequest(arch + "\n");
+            }
+            if (hasA) {
+                return new CommandRequest("Linux localhost 5.15.0 #1 SMP PREEMPT " + arch + "\n");
+            }
+            return new CommandRequest("Linux\n");
+        }
+
+        if ("cat".equals(first) && normalized.size() >= 2) {
+            String path = normalized.get(1);
+            CommandRequest catReq = handleCatCommand(path);
+            if (catReq != null) return catReq;
         }
 
         if (("sh".equals(first) || "su".equals(first)) && normalized.size() >= 3) {
@@ -147,7 +171,7 @@ public final class GetPropHooks {
         return null;
     }
 
-    private static GetPropRequest parseShellCommand(String shellCommand) {
+    private static CommandRequest parseShellCommand(String shellCommand) {
         if (shellCommand == null) {
             return null;
         }
@@ -160,16 +184,67 @@ public final class GetPropHooks {
             return null;
         }
         String first = leafName(parts[0]);
-        if (!"getprop".equals(first)) {
-            return null;
+        if ("getprop".equals(first)) {
+            if (parts.length >= 2) {
+                return new CommandRequest(false, parts[1]);
+            }
+            return new CommandRequest(true, null);
         }
-        if (parts.length >= 2) {
-            return new GetPropRequest(false, parts[1]);
+
+        if ("uname".equals(first)) {
+            boolean hasM = false;
+            boolean hasA = false;
+            for (String part : parts) {
+                if (part.contains("-m")) hasM = true;
+                if (part.contains("-a")) hasA = true;
+            }
+            String abi = ConfigManager.getCpuAbi();
+            String arch = (abi != null && abi.contains("arm64")) ? "aarch64" : "armv7l";
+            if (hasM) {
+                return new CommandRequest(arch + "\n");
+            }
+            if (hasA) {
+                return new CommandRequest("Linux localhost 5.15.0 #1 SMP PREEMPT " + arch + "\n");
+            }
+            return new CommandRequest("Linux\n");
         }
-        return new GetPropRequest(true, null);
+
+        if ("cat".equals(first) && parts.length >= 2) {
+            String path = parts[1];
+            CommandRequest catReq = handleCatCommand(path);
+            if (catReq != null) return catReq;
+        }
+        return null;
     }
 
-    private static Process buildReplacementProcess(Process originalProcess, GetPropRequest request, String packageName) {
+    private static CommandRequest handleCatCommand(String path) {
+        if (path == null) return null;
+        if (path.equals("/proc/cpuinfo")) {
+            return new CommandRequest(ConfigManager.getCpuInfoContent());
+        }
+        if (path.contains("present") || path.contains("online") || path.contains("possible")) {
+            return new CommandRequest("0-" + (ConfigManager.getCpuCores() - 1) + "\n");
+        }
+        if (path.contains("/cache/index3/size")) {
+            return new CommandRequest(ConfigManager.getCacheL3Size() + "\n");
+        }
+        if (path.contains("max_freq")) {
+            return new CommandRequest(ConfigManager.getCpuMaxFreq() + "\n");
+        }
+        if (path.contains("min_freq")) {
+            return new CommandRequest(ConfigManager.getCpuMinFreq() + "\n");
+        }
+        return null;
+    }
+
+    private static Process buildReplacementProcess(Process originalProcess, CommandRequest request, String packageName) {
+        if (!request.isGetProp) {
+            readStream(originalProcess.getInputStream());
+            readStream(originalProcess.getErrorStream());
+            waitForExit(originalProcess);
+            return new SimpleProcess(request.staticOutput != null ? request.staticOutput : "\n", "", 0);
+        }
+
         if (request.fullDump) {
             String originalStdout = readStream(originalProcess.getInputStream());
             String originalStderr = readStream(originalProcess.getErrorStream());
@@ -294,13 +369,24 @@ public final class GetPropHooks {
                 || key.contains(".build.version."));
     }
 
-    private static final class GetPropRequest {
+    private static final class CommandRequest {
+        final boolean isGetProp;
         final boolean fullDump;
         final String propertyKey;
+        final String staticOutput;
 
-        GetPropRequest(boolean fullDump, String propertyKey) {
+        CommandRequest(boolean fullDump, String propertyKey) {
+            this.isGetProp = true;
             this.fullDump = fullDump;
             this.propertyKey = propertyKey;
+            this.staticOutput = null;
+        }
+
+        CommandRequest(String staticOutput) {
+            this.isGetProp = false;
+            this.fullDump = false;
+            this.propertyKey = null;
+            this.staticOutput = staticOutput;
         }
     }
 

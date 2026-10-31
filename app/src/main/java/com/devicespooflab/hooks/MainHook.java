@@ -235,6 +235,7 @@ public class MainHook implements IXposedHookLoadPackage {
                                 return;
                             }
                             initializeHooks(lpparam);
+                            HardwareHooks.init(context);
                             BuildHooks.reapply(context.getClassLoader(), lpparam.packageName);
                             XposedBridge.log(TAG + ": Profile loaded after Application.attach for " + lpparam.packageName);
                         } catch (Throwable throwable) {
