@@ -1,0 +1,42 @@
+#!/system/bin/sh
+
+UMASK=022
+umask $UMASK
+
+OUTFD=$2
+[ -z "$OUTFD" ] && OUTFD=1
+
+ui_print() {
+  echo "$1"
+  echo "$1" >&$OUTFD 2>/dev/null
+}
+
+ZIPFILE="$3"
+[ -z "$ZIPFILE" ] && ZIPFILE="$1"
+
+ui_print "****************************************"
+ui_print "*     SMD Boot Guard for LSPosed       *"
+ui_print "*    KernelSU / Magisk Auto-Shield     *"
+ui_print "****************************************"
+
+MODID="smd_boot_guard"
+MODPATH="/data/adb/modules/$MODID"
+
+rm -rf "$MODPATH"
+mkdir -p "$MODPATH"
+
+unzip -o "$ZIPFILE" -x 'META-INF/*' -d "$MODPATH" >/dev/null 2>&1
+
+chmod 755 "$MODPATH"
+chmod 755 "$MODPATH/post-fs-data.sh" 2>/dev/null
+chmod 755 "$MODPATH/service.sh" 2>/dev/null
+chmod 755 "$MODPATH/bin" 2>/dev/null
+chmod 755 "$MODPATH/bin/smd_lsp_toggle" 2>/dev/null
+chmod 755 "$MODPATH/bin/sqlite3" 2>/dev/null
+
+touch "$MODPATH/auto_mount"
+
+ui_print "- Files extracted to $MODPATH"
+ui_print "- Permissions set"
+ui_print "- Installation complete! Ready to reboot."
+exit 0

@@ -1,0 +1,6 @@
+id=smd_boot_guard
+name=SMD Boot Guard for LSPosed
+version=1.0.0
+versionCode=100
+author=SpoofMyDevice
+description=Prevents soft-reboot black screen on OriginOS. Disables SMD in LSPosed during boot, automatically re-enables it once home screen (sys.boot_completed) is reached.

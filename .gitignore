@@ -18,6 +18,8 @@ jadx_hw
 # OS
 .DS_Store
 Thumbs.db
-
+lsp*
 # Runtime config
 device_profile.conf
+ksu_module/**/bin/
+release/
