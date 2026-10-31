@@ -58,7 +58,6 @@ public class MainHook implements IXposedHookLoadPackage {
         }
         if ("android".equals(packageName)
             || "com.android.systemui".equals(packageName)
-            || packageName.equals(MODULE_PACKAGE)
             || packageName.startsWith("org.lsposed.")
             || packageName.startsWith("me.weishu.kernelsu")
             || packageName.startsWith("io.github.a13e300.ksu")
@@ -82,13 +81,13 @@ public class MainHook implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
-        if (isSystemCriticalPackage(lpparam.packageName)) {
-            XposedBridge.log(TAG + ": Skipping system critical package " + lpparam.packageName);
+        if (MODULE_PACKAGE.equals(lpparam.packageName)) {
+            hookActivationCheck(lpparam);
             return;
         }
 
-        if (MODULE_PACKAGE.equals(lpparam.packageName)) {
-            hookActivationCheck(lpparam);
+        if (isSystemCriticalPackage(lpparam.packageName)) {
+            XposedBridge.log(TAG + ": Skipping system critical package " + lpparam.packageName);
             return;
         }
 
@@ -345,6 +344,16 @@ public class MainHook implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + ": Activation check hooked for companion app");
         } catch (Throwable throwable) {
             XposedBridge.log(TAG + ": Failed to hook activation check: " + throwable.getMessage());
+        }
+
+        try {
+            XposedHelpers.findAndHookMethod(
+                "com.devicespooflab.hooks.ui.SpoofAppState",
+                lpparam.classLoader,
+                "isModuleActivated",
+                XC_MethodReplacement.returnConstant(true)
+            );
+        } catch (Throwable ignored) {
         }
     }
 }

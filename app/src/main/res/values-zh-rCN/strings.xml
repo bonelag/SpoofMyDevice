@@ -217,5 +217,7 @@
     <string name="safe_mode_dont_show_again">不再显示</string>
     <string name="safe_mode_more_options">更多选项</string>
 
-    <string-array name="xposed_scope" />
+    <string-array name="xposed_scope">
+        <item>com.spoofmydevice</item>
+    </string-array>
 </resources>

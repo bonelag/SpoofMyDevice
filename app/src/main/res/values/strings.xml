@@ -263,6 +263,8 @@
     <string name="profile_default_removed_message" translatable="false">Default profile removed.</string>
     <string name="app_profile_none_summary_with_default" translatable="false">Will use the default profile (%1$s).</string>
 
-    <!-- Empty scope - user selects apps in LSPosed -->
-    <string-array name="xposed_scope" />
+    <!-- Module scope: com.spoofmydevice for self-activation check; user adds target apps in LSPosed -->
+    <string-array name="xposed_scope">
+        <item>com.spoofmydevice</item>
+    </string-array>
 </resources>
