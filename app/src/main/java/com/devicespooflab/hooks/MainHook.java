@@ -52,6 +52,39 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final Set<String> INITIALIZED_HOOK_PROCESSES = ConcurrentHashMap.newKeySet();
     private static final Set<String> CONFIG_RECEIVER_PROCESSES = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Do not touch any process during the early boot window.
+     *
+     * Before sys.boot_completed=1, system_server, SystemUI and the package manager are
+     * still serializing app startup behind their internal locks. Any blocking IPC from a
+     * hooked app back into the module app (ContentProvider call / ordered broadcast) can
+     * stall that startup and leave bootanimation stuck for its full 55s watchdog period,
+     * after which SurfaceFlinger force-kills it (MediaTek mutex abort) and the UI stays
+     * black. Keeping the module fully dormant until the boot completes is what makes
+     * soft reboots with SMD enabled safe on OriginOS.
+     */
+    private static volatile boolean bootCompleted = false;
+
+    private static boolean isBootCompleted() {
+        if (bootCompleted) {
+            return true;
+        }
+        try {
+            Class<?> sysPropClass = XposedHelpers.findClassIfExists(
+                "android.os.SystemProperties", MainHook.class.getClassLoader());
+            if (sysPropClass != null) {
+                Object v = XposedHelpers.callStaticMethod(
+                    sysPropClass, "get", "sys.boot_completed");
+                if (v != null && !v.toString().isEmpty() && !"0".equals(v.toString())) {
+                    bootCompleted = true;
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static boolean isSystemCriticalPackage(String packageName) {
         if (packageName == null || packageName.isEmpty()) {
             return true;
@@ -96,6 +129,15 @@ public class MainHook implements IXposedHookLoadPackage {
 
         if (isSystemCriticalPackage(lpparam.packageName)) {
             XposedBridge.log(TAG + ": Skipping system critical package " + lpparam.packageName);
+            return;
+        }
+
+        // Do not run any module work during early boot. See isBootCompleted().
+        if (!isBootCompleted()) {
+            XposedBridge.log(TAG + ": Boot not completed, deferring hooks for " + lpparam.packageName);
+            // Still arm the Application.attach path so hooks are applied the moment
+            // the system is ready, but the attach path itself re-checks the flag.
+            hookApplicationAttachForInitialization(lpparam);
             return;
         }
 
@@ -260,6 +302,14 @@ public class MainHook implements IXposedHookLoadPackage {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
+                        // Never run config work while the system is still booting.
+                        // Application.attach of early-start components happens before
+                        // sys.boot_completed=1; touching ContentProviders/broadcasts here
+                        // risks the boot stall described in isBootCompleted().
+                        if (!isBootCompleted()) {
+                            XposedBridge.log(TAG + ": Boot not completed, skipping attach init for " + lpparam.packageName);
+                            return;
+                        }
                         try {
                             Context context = (Context) param.args[0];
                             ConfigManager.forceReload(context);
