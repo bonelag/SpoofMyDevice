@@ -1,16 +1,9 @@
 package com.devicespooflab.hooks.hooks;
 
 import android.app.ActivityManager;
-import android.content.Context;
 import android.os.Debug;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -21,60 +14,21 @@ public class HardwareHooks {
 
     private static final String TAG = "DeviceSpoofLab-Hardware";
     private static final long DEFAULT_RAM_BYTES = 12L * 1024 * 1024 * 1024; // 12GB
-    private static final long DEFAULT_RAM_KB = 12L * 1024 * 1024; // 12GB in KB
-
-    private static volatile File appSmdDir = null;
-
-    public static void init(Context context) {
-        if (context == null) return;
-        try {
-            File cacheDir = context.getCacheDir();
-            if (cacheDir == null) return;
-            File smdDir = new File(cacheDir, ".smd");
-            if (!smdDir.exists()) {
-                smdDir.mkdirs();
-            }
-            File cpuInfoFile = new File(smdDir, "cpuinfo");
-            writeTextFile(cpuInfoFile, ConfigManager.getCpuInfoContent());
-            ConfigManager.setAppCpuInfoFile(cpuInfoFile);
-
-            int cores = ConfigManager.getCpuCores();
-            String coreRange = "0-" + (cores > 0 ? cores - 1 : 7) + "\n";
-            writeTextFile(new File(smdDir, "present"), coreRange);
-            writeTextFile(new File(smdDir, "online"), coreRange);
-            writeTextFile(new File(smdDir, "possible"), coreRange);
-            writeTextFile(new File(smdDir, "cache_l3"), ConfigManager.getCacheL3Size() + "\n");
-            writeTextFile(new File(smdDir, "max_freq"), ConfigManager.getCpuMaxFreq() + "\n");
-            writeTextFile(new File(smdDir, "min_freq"), ConfigManager.getCpuMinFreq() + "\n");
-            appSmdDir = smdDir;
-        } catch (Throwable t) {
-            XposedBridge.log(TAG + ": Failed to init cache files: " + t.getMessage());
-        }
-    }
-
-    private static void writeTextFile(File file, String content) {
-        try (FileOutputStream fos = new FileOutputStream(file, false)) {
-            fos.write(content.getBytes(StandardCharsets.UTF_8));
-        } catch (Throwable ignored) {
-        }
-    }
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            hookRuntimeCores();
-            hookOsUname();
+            hookRuntimeCores(lpparam);
             hookActivityManagerMemory(lpparam);
             hookDebugMemory();
-            hookFileReads();
             hookGnssLocation(lpparam);
             hookDeviceInfoHw(lpparam);
-            XposedBridge.log(TAG + ": Successfully hooked hardware specs");
+            XposedBridge.log(TAG + ": Successfully hooked hardware specs for " + lpparam.packageName);
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook hardware: " + e.getMessage());
         }
     }
 
-    private static void hookRuntimeCores() {
+    private static void hookRuntimeCores(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(Runtime.class, "availableProcessors",
                 new XC_MethodHook() {
@@ -88,39 +42,6 @@ public class HardwareHooks {
                 });
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook Runtime.availableProcessors(): " + e.getMessage());
-        }
-    }
-
-    private static void hookOsUname() {
-        XC_MethodHook unameHook = new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                Object original = param.getResult();
-                if (original != null) {
-                    String abi = ConfigManager.getCpuAbi();
-                    String machine = (abi != null && abi.contains("arm64")) ? "aarch64" : "armv7l";
-                    try {
-                        XposedHelpers.setObjectField(original, "machine", machine);
-                    } catch (Throwable ignored) {
-                    }
-                }
-            }
-        };
-
-        try {
-            Class<?> osClass = XposedHelpers.findClassIfExists("android.system.Os", null);
-            if (osClass != null) {
-                XposedHelpers.findAndHookMethod(osClass, "uname", unameHook);
-            }
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            Class<?> forwardingOsClass = XposedHelpers.findClassIfExists("libcore.io.ForwardingOs", null);
-            if (forwardingOsClass != null) {
-                XposedHelpers.findAndHookMethod(forwardingOsClass, "uname", unameHook);
-            }
-        } catch (Throwable ignored) {
         }
     }
 
@@ -139,12 +60,12 @@ public class HardwareHooks {
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         ActivityManager.MemoryInfo memInfo = (ActivityManager.MemoryInfo) param.args[0];
                         if (memInfo != null) {
-                            memInfo.totalMem = DEFAULT_RAM_BYTES;
                             long originalTotal = memInfo.totalMem;
                             if (originalTotal > 0) {
                                 double usedRatio = 1.0 - ((double) memInfo.availMem / originalTotal);
                                 memInfo.availMem = (long) (DEFAULT_RAM_BYTES * (1.0 - usedRatio));
                             }
+                            memInfo.totalMem = DEFAULT_RAM_BYTES;
                         }
                     }
                 });
@@ -181,147 +102,6 @@ public class HardwareHooks {
                     }
                 });
         } catch (Exception ignored) {
-        }
-    }
-
-    private static File getRedirectedFile(String path) {
-        if (path == null) return null;
-        File dir = appSmdDir;
-        if (dir == null || !dir.exists()) {
-            File fallback = new File("/data/local/tmp/spoofmydevice");
-            if (fallback.exists()) {
-                dir = fallback;
-            }
-        }
-        if (dir == null || !dir.exists()) return null;
-
-        if (path.equals("/proc/cpuinfo")) {
-            File f = new File(dir, "cpuinfo");
-            if (f.exists()) return f;
-        }
-        if (path.equals("/sys/devices/system/cpu/present")) {
-            File f = new File(dir, "present");
-            if (f.exists()) return f;
-        }
-        if (path.equals("/sys/devices/system/cpu/online")) {
-            File f = new File(dir, "online");
-            if (f.exists()) return f;
-        }
-        if (path.equals("/sys/devices/system/cpu/possible")) {
-            File f = new File(dir, "possible");
-            if (f.exists()) return f;
-        }
-        if (path.contains("/cache/index3/size")) {
-            File f = new File(dir, "cache_l3");
-            if (f.exists()) return f;
-        }
-        if (path.contains("cpuinfo_max_freq") || path.contains("scaling_max_freq") || path.contains("scaling_cur_freq")) {
-            File f = new File(dir, "max_freq");
-            if (f.exists()) return f;
-        }
-        if (path.contains("cpuinfo_min_freq") || path.contains("scaling_min_freq")) {
-            File f = new File(dir, "min_freq");
-            if (f.exists()) return f;
-        }
-        return null;
-    }
-
-    private static void hookFileReads() {
-        try {
-            XposedHelpers.findAndHookConstructor(FileInputStream.class, File.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        File file = (File) param.args[0];
-                        if (file != null) {
-                            File redir = getRedirectedFile(file.getPath());
-                            if (redir != null) {
-                                param.args[0] = redir;
-                            }
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            XposedHelpers.findAndHookConstructor(FileInputStream.class, String.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        String path = (String) param.args[0];
-                        if (path != null) {
-                            File redir = getRedirectedFile(path);
-                            if (redir != null) {
-                                param.args[0] = redir.getAbsolutePath();
-                            }
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            XposedHelpers.findAndHookConstructor(RandomAccessFile.class, File.class, String.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        File file = (File) param.args[0];
-                        if (file != null) {
-                            File redir = getRedirectedFile(file.getPath());
-                            if (redir != null) {
-                                param.args[0] = redir;
-                            }
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            XposedHelpers.findAndHookConstructor(RandomAccessFile.class, String.class, String.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        String path = (String) param.args[0];
-                        if (path != null) {
-                            File redir = getRedirectedFile(path);
-                            if (redir != null) {
-                                param.args[0] = redir.getAbsolutePath();
-                            }
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            XposedHelpers.findAndHookMethod(RandomAccessFile.class, "readLine",
-                new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        String line = (String) param.getResult();
-                        if (line != null && line.startsWith("MemTotal:")) {
-                            param.setResult("MemTotal:       " + DEFAULT_RAM_KB + " kB");
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
-        }
-
-        try {
-            XposedHelpers.findAndHookMethod(File.class, "exists",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        File file = (File) param.thisObject;
-                        String path = file.getPath();
-                        if ("/proc/cpuinfo".equals(path) || (path != null && path.startsWith("/sys/devices/system/cpu/"))) {
-                            param.setResult(true);
-                        }
-                    }
-                });
-        } catch (Throwable ignored) {
         }
     }
 

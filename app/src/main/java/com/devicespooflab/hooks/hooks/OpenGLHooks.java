@@ -17,17 +17,17 @@ public class OpenGLHooks {
     private static final int GL_SHADING_LANGUAGE_VERSION = 0x8B8C;
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
-        hookGles20();
-        hookGles10();
-        hookGles30();
+        hookGles20(lpparam);
+        hookGles10(lpparam);
+        hookGles30(lpparam);
         hookGl10(lpparam);
     }
 
-    private static void hookGles20() {
+    private static void hookGles20(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(
                 "android.opengl.GLES20",
-                null,
+                lpparam.classLoader,
                 "glGetString",
                 int.class,
                 new XC_MethodHook() {
@@ -46,11 +46,11 @@ public class OpenGLHooks {
         }
     }
 
-    private static void hookGles10() {
+    private static void hookGles10(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(
                 "android.opengl.GLES10",
-                null,
+                lpparam.classLoader,
                 "glGetString",
                 int.class,
                 new XC_MethodHook() {
@@ -69,11 +69,11 @@ public class OpenGLHooks {
         }
     }
 
-    private static void hookGles30() {
+    private static void hookGles30(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(
                 "android.opengl.GLES30",
-                null,
+                lpparam.classLoader,
                 "glGetString",
                 int.class,
                 new XC_MethodHook() {

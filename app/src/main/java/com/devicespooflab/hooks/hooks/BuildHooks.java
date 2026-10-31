@@ -77,15 +77,13 @@ public class BuildHooks {
     }
 
     private static Class<?> findBuildClass(ClassLoader classLoader, String className) {
-        Class<?> clazz = XposedHelpers.findClassIfExists(className, null);
-        if (clazz != null) {
-            return clazz;
+        if (classLoader != null) {
+            Class<?> clazz = XposedHelpers.findClassIfExists(className, classLoader);
+            if (clazz != null) {
+                return clazz;
+            }
         }
-        clazz = XposedHelpers.findClassIfExists(className, classLoader);
-        if (clazz != null) {
-            return clazz;
-        }
-        return XposedHelpers.findClassIfExists(className, ClassLoader.getSystemClassLoader());
+        return XposedHelpers.findClassIfExists(className, null);
     }
 
     private static void applyBuildFields(Class<?> buildClass) {

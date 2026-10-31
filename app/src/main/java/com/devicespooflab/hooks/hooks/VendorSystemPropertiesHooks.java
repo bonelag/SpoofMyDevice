@@ -22,9 +22,11 @@ public final class VendorSystemPropertiesHooks {
     }
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
+        if (lpparam.classLoader == null) {
+            return;
+        }
         for (String className : CANDIDATE_CLASSES) {
             hookClass(className, lpparam.classLoader, lpparam.packageName);
-            hookClass(className, null, lpparam.packageName);
         }
     }
 

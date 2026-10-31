@@ -211,16 +211,6 @@ public class ConfigManager {
             XposedBridge.log("SpoofMyDevice: readFromProvider failed: " + t.getMessage());
         }
 
-        // 4. Try BridgeReceiver
-        try {
-            Map<String, String> configFromBridgeReceiver = readFromBridgeReceiver(preferredContext);
-            if (!configFromBridgeReceiver.isEmpty()) {
-                return new LoadedProperties(configFromBridgeReceiver, false);
-            }
-        } catch (Throwable t) {
-            XposedBridge.log("SpoofMyDevice: readFromBridgeReceiver failed: " + t.getMessage());
-        }
-
         return new LoadedProperties(getEmbeddedDefaults(), true);
     }
 
@@ -323,6 +313,22 @@ public class ConfigManager {
         return Collections.emptyMap();
     }
 
+    public static boolean isSystemPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return true;
+        return packageName.equals("android")
+            || packageName.equals("com.android.systemui")
+            || packageName.contains(".launcher")
+            || packageName.startsWith("com.bbk.launcher")
+            || packageName.startsWith("com.vivo.upslide")
+            || packageName.startsWith("com.vivo.daemonService")
+            || packageName.startsWith("com.vivo.fingerprint")
+            || packageName.startsWith("com.vivo.ambient")
+            || packageName.startsWith("com.vivo.secime")
+            || packageName.startsWith("org.lsposed.")
+            || packageName.startsWith("me.weishu.kernelsu")
+            || packageName.startsWith("io.github.a13e300.ksu");
+    }
+
     private static Map<String, String> resolveConfigFromJson(String json, String packageName) {
         if (json == null || json.trim().isEmpty()) {
             return Collections.emptyMap();
@@ -339,7 +345,7 @@ public class ConfigManager {
                     profileId = null;
                 }
             }
-            if (profileId == null && globalProps != null) {
+            if (profileId == null && globalProps != null && !isSystemPackage(packageName)) {
                 profileId = globalProps.optString(KEY_DEFAULT_PROFILE_ID, null);
                 if (profileId != null && profileId.isEmpty()) {
                     profileId = null;
@@ -808,11 +814,6 @@ public class ConfigManager {
                 || key.equals("ro.product.customize.bbk")
                 || key.equals("ro.product.net.entry.bbk")
                 || key.equals("ro.vivo.product.platform")
-                || key.equals("ro.vendor.mediatek.platform")
-                || key.startsWith("ro.vendor.mediatek.")
-                || key.startsWith("ro.mediatek.")
-                || key.startsWith("ro.vendor.mtk.")
-                || key.startsWith("ro.mtk.")
                 || key.equals("ro.vendor.soc.model")
                 || key.equals("ro.vendor.soc.model.external_name")
                 || key.equals("ro.vendor.soc.model.part_name")
@@ -1828,12 +1829,6 @@ public class ConfigManager {
             || board.contains("cubs") || board.contains("stallion") || platform.contains("malibu") || platform.contains("laguna");
     }
 
-    private static File appCpuInfoFile = null;
-
-    public static void setAppCpuInfoFile(File file) {
-        appCpuInfoFile = file;
-    }
-
     public static String getCacheL3Size() {
         String model = getSocModel().toLowerCase(Locale.US);
         if (model.contains("elite") || model.contains("sm8750")) {
@@ -1900,17 +1895,6 @@ public class ConfigManager {
         }
         sb.append("Hardware\t: ").append(cpuHw).append("\n");
         return sb.toString();
-    }
-
-    public static File getCpuInfoFile() {
-        if (appCpuInfoFile != null && appCpuInfoFile.exists()) {
-            return appCpuInfoFile;
-        }
-        File file = new File("/data/local/tmp/spoofmydevice/cpuinfo");
-        if (file.exists() && file.length() > 0) {
-            return file;
-        }
-        return null;
     }
 
     private static int parseInt(String value, int fallback) {

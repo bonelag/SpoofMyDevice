@@ -23,19 +23,9 @@ public class SystemPropertiesHooks {
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            hookSystemProperties(null, lpparam.packageName);
-
-            // Hook SystemProperties in app's classloader
-            hookSystemProperties(lpparam.classLoader, lpparam.packageName);
-
-            // Also try to hook in system classloader (for apps that use it)
-            try {
-                ClassLoader systemClassLoader = ClassLoader.getSystemClassLoader();
-                if (systemClassLoader != null && systemClassLoader != lpparam.classLoader) {
-                    hookSystemProperties(systemClassLoader, lpparam.packageName);
-                }
-            } catch (Exception e) {
-                // System classloader hook failed, that's okay
+            // Hook SystemProperties in app's classloader only
+            if (lpparam.classLoader != null) {
+                hookSystemProperties(lpparam.classLoader, lpparam.packageName);
             }
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook SystemProperties: " + e.getMessage());

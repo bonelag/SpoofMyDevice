@@ -52,12 +52,38 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final Set<String> INITIALIZED_HOOK_PROCESSES = ConcurrentHashMap.newKeySet();
     private static final Set<String> CONFIG_RECEIVER_PROCESSES = ConcurrentHashMap.newKeySet();
 
+    private static boolean isSystemCriticalPackage(String packageName) {
+        if (packageName == null || packageName.isEmpty()) {
+            return true;
+        }
+        if ("android".equals(packageName)
+            || "com.android.systemui".equals(packageName)
+            || packageName.equals(MODULE_PACKAGE)
+            || packageName.startsWith("org.lsposed.")
+            || packageName.startsWith("me.weishu.kernelsu")
+            || packageName.startsWith("io.github.a13e300.ksu")
+            || packageName.startsWith("com.topjohnwu.magisk")
+            || packageName.contains(".launcher")
+            || packageName.startsWith("com.bbk.launcher")
+            || packageName.startsWith("com.vivo.upslide")
+            || packageName.startsWith("com.vivo.daemonService")
+            || packageName.startsWith("com.vivo.fingerprint")
+            || packageName.startsWith("com.vivo.ambient")
+            || packageName.startsWith("com.vivo.secime")
+            || packageName.contains("inputmethod")
+            || packageName.startsWith("com.google.android.inputmethod")
+            || packageName.startsWith("com.android.server")
+            || packageName.startsWith("com.android.keyguard")
+            || packageName.startsWith("com.android.wallpaper")) {
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
-        XposedBridge.log(TAG + ": Loading hooks for " + lpparam.packageName);
-
-        if ("android".equals(lpparam.packageName)) {
-            XposedBridge.log(TAG + ": Skipping Android system framework");
+        if (isSystemCriticalPackage(lpparam.packageName)) {
+            XposedBridge.log(TAG + ": Skipping system critical package " + lpparam.packageName);
             return;
         }
 
@@ -66,6 +92,7 @@ public class MainHook implements IXposedHookLoadPackage {
             return;
         }
 
+        XposedBridge.log(TAG + ": Loading hooks for " + lpparam.packageName);
         hookApplicationAttachForInitialization(lpparam);
 
         try {
@@ -220,7 +247,7 @@ public class MainHook implements IXposedHookLoadPackage {
         try {
             XposedHelpers.findAndHookMethod(
                 "android.app.Application",
-                null,
+                lpparam.classLoader,
                 "attach",
                 android.content.Context.class,
                 new XC_MethodHook() {
@@ -235,7 +262,6 @@ public class MainHook implements IXposedHookLoadPackage {
                                 return;
                             }
                             initializeHooks(lpparam);
-                            HardwareHooks.init(context);
                             BuildHooks.reapply(context.getClassLoader(), lpparam.packageName);
                             XposedBridge.log(TAG + ": Profile loaded after Application.attach for " + lpparam.packageName);
                         } catch (Throwable throwable) {

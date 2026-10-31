@@ -22,14 +22,17 @@ public class DisplayHooks {
     private static final String TAG = "DeviceSpoofLab-Display";
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
-        hookResourcesMetrics();
+        if (!ConfigManager.shouldApplyScreenMetrics()) {
+            return;
+        }
+        hookResourcesMetrics(lpparam);
         hookDisplayMetrics(lpparam);
         hookWindowMetrics(lpparam);
     }
 
-    private static void hookResourcesMetrics() {
+    private static void hookResourcesMetrics(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            XposedHelpers.findAndHookMethod("android.content.res.Resources", null, "getDisplayMetrics",
+            XposedHelpers.findAndHookMethod("android.content.res.Resources", lpparam.classLoader, "getDisplayMetrics",
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
@@ -44,7 +47,7 @@ public class DisplayHooks {
         }
 
         try {
-            XposedHelpers.findAndHookMethod("android.content.res.Resources", null, "getConfiguration",
+            XposedHelpers.findAndHookMethod("android.content.res.Resources", lpparam.classLoader, "getConfiguration",
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {

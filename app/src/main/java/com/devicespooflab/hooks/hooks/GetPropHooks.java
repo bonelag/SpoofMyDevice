@@ -222,17 +222,19 @@ public final class GetPropHooks {
         if (path.equals("/proc/cpuinfo")) {
             return new CommandRequest(ConfigManager.getCpuInfoContent());
         }
-        if (path.contains("present") || path.contains("online") || path.contains("possible")) {
-            return new CommandRequest("0-" + (ConfigManager.getCpuCores() - 1) + "\n");
-        }
-        if (path.contains("/cache/index3/size")) {
-            return new CommandRequest(ConfigManager.getCacheL3Size() + "\n");
-        }
-        if (path.contains("max_freq")) {
-            return new CommandRequest(ConfigManager.getCpuMaxFreq() + "\n");
-        }
-        if (path.contains("min_freq")) {
-            return new CommandRequest(ConfigManager.getCpuMinFreq() + "\n");
+        if (path.startsWith("/sys/devices/system/cpu/")) {
+            if (path.endsWith("/present") || path.endsWith("/online") || path.endsWith("/possible")) {
+                return new CommandRequest("0-" + (ConfigManager.getCpuCores() - 1) + "\n");
+            }
+            if (path.contains("/cache/index3/size")) {
+                return new CommandRequest(ConfigManager.getCacheL3Size() + "\n");
+            }
+            if (path.contains("max_freq")) {
+                return new CommandRequest(ConfigManager.getCpuMaxFreq() + "\n");
+            }
+            if (path.contains("min_freq")) {
+                return new CommandRequest(ConfigManager.getCpuMinFreq() + "\n");
+            }
         }
         return null;
     }
