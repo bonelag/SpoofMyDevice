@@ -32,32 +32,6 @@ public class ConfigProvider extends ContentProvider {
 
     @Nullable
     @Override
-    public ParcelFileDescriptor openFile(@NonNull Uri uri, @NonNull String mode) throws FileNotFoundException {
-        if (getContext() == null || !FILE_NAME.equals(uri.getLastPathSegment()) || !"r".equals(mode)) {
-            throw new FileNotFoundException("Unknown config uri: " + uri);
-        }
-        String content = readConfigContent(resolvePackageName(uri, null));
-        if (content == null) {
-            throw new FileNotFoundException("No profile is assigned to the requested package");
-        }
-        try {
-            ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
-            Thread writer = new Thread(() -> {
-                try (ParcelFileDescriptor.AutoCloseOutputStream outputStream =
-                         new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
-                    outputStream.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                } catch (IOException ignored) {
-                }
-            }, "spoofmydevice-config-provider");
-            writer.start();
-            return pipe[0];
-        } catch (IOException exception) {
-            throw new FileNotFoundException(exception.getMessage());
-        }
-    }
-
-    @Nullable
-    @Override
     public String getType(@NonNull Uri uri) {
         return "text/plain";
     }

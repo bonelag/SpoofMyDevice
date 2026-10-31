@@ -218,7 +218,6 @@ public class ConfigManager {
         // Candidate 1: standard module preferences
         try {
             XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice", "app_profiles");
-            xsp.makeWorldReadable();
             xsp.reload();
 
             Map<String, String> result = extractFromXsp(xsp, "app_profiles");
@@ -232,7 +231,6 @@ public class ConfigManager {
         // Candidate 2: default preferences name
         try {
             XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice");
-            xsp.makeWorldReadable();
             xsp.reload();
 
             Map<String, String> result = extractFromXsp(xsp, "default");
@@ -259,13 +257,15 @@ public class ConfigManager {
             }
         }
 
-        String defConfig = xsp.getString("default_config", null);
-        if (defConfig != null && !defConfig.trim().isEmpty()) {
-            InputStream stream = new java.io.ByteArrayInputStream(defConfig.getBytes(StandardCharsets.UTF_8));
-            Map<String, String> parsed = parseConfigStream(stream);
-            if (!parsed.isEmpty()) {
-                XposedBridge.log("SpoofMyDevice: Loaded default profile via XSharedPreferences (" + label + ") for " + targetPackageName);
-                return parsed;
+        if (!isSystemPackage(targetPackageName)) {
+            String defConfig = xsp.getString("default_config", null);
+            if (defConfig != null && !defConfig.trim().isEmpty()) {
+                InputStream stream = new java.io.ByteArrayInputStream(defConfig.getBytes(StandardCharsets.UTF_8));
+                Map<String, String> parsed = parseConfigStream(stream);
+                if (!parsed.isEmpty()) {
+                    XposedBridge.log("SpoofMyDevice: Loaded default profile via XSharedPreferences (" + label + ") for " + targetPackageName);
+                    return parsed;
+                }
             }
         }
 
@@ -388,28 +388,11 @@ public class ConfigManager {
     }
 
     private static Map<String, String> readFromProvider(Context preferredContext) {
-        try {
-            Context context = preferredContext != null ? preferredContext : resolveAnyContext();
-            if (context == null) {
-                return new HashMap<>();
-            }
-
-            Uri configUri = ConfigProvider.CONFIG_URI.buildUpon()
-                .appendQueryParameter(ConfigProvider.QUERY_PACKAGE, targetPackageName)
-                .build();
-            try (InputStream inputStream = context.getContentResolver().openInputStream(configUri)) {
-                if (inputStream != null) {
-                    return parseConfigStream(inputStream);
-                }
-            }
-        } catch (Exception exception) {
+        if (preferredContext == null || isSystemPackage(targetPackageName)) {
+            return Collections.emptyMap();
         }
         try {
-            Context context = preferredContext != null ? preferredContext : resolveAnyContext();
-            if (context == null) {
-                return new HashMap<>();
-            }
-            Bundle bundle = context.getContentResolver().call(
+            Bundle bundle = preferredContext.getContentResolver().call(
                 ConfigProvider.CONFIG_URI,
                 ConfigProvider.METHOD_GET_CONFIG,
                 targetPackageName,
@@ -417,40 +400,14 @@ public class ConfigManager {
             );
             if (bundle != null) {
                 String content = bundle.getString(ConfigProvider.COLUMN_CONTENT);
-                if (content != null) {
+                if (content != null && !content.trim().isEmpty()) {
                     InputStream stream = new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
                     return parseConfigStream(stream);
                 }
             }
-        } catch (Exception exception) {
+        } catch (Throwable ignored) {
         }
-        try {
-            Context context = preferredContext != null ? preferredContext : resolveAnyContext();
-            if (context == null) {
-                return new HashMap<>();
-            }
-            Uri configUri = ConfigProvider.CONFIG_URI;
-            try (Cursor cursor = context.getContentResolver().query(
-                configUri,
-                null,
-                null,
-                new String[]{targetPackageName},
-                null
-            )) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int contentColumn = cursor.getColumnIndex(ConfigProvider.COLUMN_CONTENT);
-                    if (contentColumn >= 0) {
-                        String content = cursor.getString(contentColumn);
-                        if (content != null) {
-                            InputStream stream = new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-                            return parseConfigStream(stream);
-                        }
-                    }
-                }
-            }
-        } catch (Exception exception) {
-        }
-        return new HashMap<>();
+        return Collections.emptyMap();
     }
 
     private static Map<String, String> readFromBridgeReceiver(Context preferredContext) {

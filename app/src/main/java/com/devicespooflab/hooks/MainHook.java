@@ -306,10 +306,13 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private void hookActivityLifecycleForReapply(XC_LoadPackage.LoadPackageParam lpparam) {
+        if (lpparam.classLoader == null) {
+            return;
+        }
         try {
             XposedHelpers.findAndHookMethod(
                 "android.app.Activity",
-                null,
+                lpparam.classLoader,
                 "onCreate",
                 android.os.Bundle.class,
                 new XC_MethodHook() {
