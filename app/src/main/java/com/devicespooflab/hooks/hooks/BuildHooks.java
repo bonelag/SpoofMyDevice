@@ -29,6 +29,21 @@ public class BuildHooks {
         reapply(lpparam.classLoader, lpparam.packageName);
     }
 
+    public static void captureOriginals(ClassLoader classLoader) {
+        try {
+            Class<?> buildClass = findBuildClass(classLoader, "android.os.Build");
+            Class<?> versionClass = findBuildClass(classLoader, "android.os.Build$VERSION");
+            if (buildClass != null) {
+                captureOriginalBuildFields(buildClass);
+            }
+            if (versionClass != null) {
+                captureOriginalVersionFields(versionClass);
+            }
+        } catch (Throwable throwable) {
+            XposedBridge.log(TAG + ": Failed to capture original Build fields: " + throwable);
+        }
+    }
+
     public static void reapply(ClassLoader classLoader) {
         reapply(classLoader, null);
     }
@@ -48,7 +63,7 @@ public class BuildHooks {
                 captureOriginalVersionFields(versionClass);
             }
 
-            if (ConfigManager.isUsingEmbeddedDefaults()) {
+            if (!ConfigManager.hasAssignedProfile()) {
                 restoreBuildFields(buildClass);
                 if (versionClass != null) {
                     restoreVersionFields(versionClass);
@@ -278,6 +293,9 @@ public class BuildHooks {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
+                        if (!ConfigManager.isSpoofEnabled(ConfigManager.FIELD_SERIAL_NUMBER)) {
+                            return;
+                        }
                         String spoofedValue = ConfigManager.getSerial();
                         if (spoofedValue != null) {
                             param.setResult(spoofedValue);
@@ -297,6 +315,9 @@ public class BuildHooks {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
+                        if (!ConfigManager.isSpoofEnabled(ConfigManager.FIELD_BASEBAND)) {
+                            return;
+                        }
                         String spoofedValue = ConfigManager.getBaseband();
                         if (spoofedValue != null && !spoofedValue.isEmpty()) {
                             param.setResult(spoofedValue);

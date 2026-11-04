@@ -23,6 +23,7 @@ public class ConfigProvider extends ContentProvider {
     public static final Uri CONFIG_URI = Uri.parse("content://" + AUTHORITY + "/" + FILE_NAME);
     public static final String COLUMN_CONTENT = "content";
     public static final String METHOD_GET_CONFIG = "get_config";
+    public static final String METHOD_GET_STATE = "get_state";
     public static final String QUERY_PACKAGE = "package";
 
     @Override
@@ -52,6 +53,15 @@ public class ConfigProvider extends ContentProvider {
     @Nullable
     @Override
     public Bundle call(@NonNull String method, @Nullable String arg, @Nullable Bundle extras) {
+        if (METHOD_GET_STATE.equals(method)) {
+            String state = AppProfileStore.readStateContent(getContext());
+            if (state == null) {
+                return null;
+            }
+            Bundle bundle = new Bundle();
+            bundle.putString(COLUMN_CONTENT, state);
+            return bundle;
+        }
         if (!METHOD_GET_CONFIG.equals(method)) {
             return super.call(method, arg, extras);
         }

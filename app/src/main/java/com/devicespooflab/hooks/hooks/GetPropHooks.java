@@ -1,13 +1,9 @@
 package com.devicespooflab.hooks.hooks;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.GetPropOutputRewriter;
+import com.devicespooflab.hooks.utils.RewritingProcess;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -40,7 +36,8 @@ public final class GetPropHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         Process originalProcess = (Process) param.getResult();
-                        if (originalProcess == null) {
+                        if (originalProcess == null || originalProcess instanceof RewritingProcess
+                            || !ConfigManager.hasAssignedProfile()) {
                             return;
                         }
 
@@ -79,7 +76,9 @@ public final class GetPropHooks {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 Process originalProcess = (Process) param.getResult();
-                if (originalProcess == null || param.args.length == 0 || param.args[0] == null) {
+                if (originalProcess == null || originalProcess instanceof RewritingProcess
+                    || !ConfigManager.hasAssignedProfile()
+                    || param.args.length == 0 || param.args[0] == null) {
                     return;
                 }
 
@@ -132,6 +131,9 @@ public final class GetPropHooks {
 
         String first = leafName(normalized.get(0));
         if ("getprop".equals(first)) {
+            if (normalized.size() > 3 || (normalized.size() >= 2 && normalized.get(1).startsWith("-"))) {
+                return null;
+            }
             if (normalized.size() >= 2) {
                 return new CommandRequest(false, normalized.get(1));
             }
@@ -156,7 +158,7 @@ public final class GetPropHooks {
             return new CommandRequest("Linux\n");
         }
 
-        if ("cat".equals(first) && normalized.size() >= 2) {
+        if ("cat".equals(first) && normalized.size() == 2) {
             String path = normalized.get(1);
             CommandRequest catReq = handleCatCommand(path);
             if (catReq != null) return catReq;
@@ -179,42 +181,15 @@ public final class GetPropHooks {
         if (trimmed.isEmpty()) {
             return null;
         }
+        // Compound commands can run arbitrary children; only rewrite a simple command.
+        if (trimmed.matches("(?s).*[|&;<>\\r\\n`$'\"\\\\].*")) {
+            return null;
+        }
         String[] parts = trimmed.split("\\s+");
         if (parts.length == 0) {
             return null;
         }
-        String first = leafName(parts[0]);
-        if ("getprop".equals(first)) {
-            if (parts.length >= 2) {
-                return new CommandRequest(false, parts[1]);
-            }
-            return new CommandRequest(true, null);
-        }
-
-        if ("uname".equals(first)) {
-            boolean hasM = false;
-            boolean hasA = false;
-            for (String part : parts) {
-                if (part.contains("-m")) hasM = true;
-                if (part.contains("-a")) hasA = true;
-            }
-            String abi = ConfigManager.getCpuAbi();
-            String arch = (abi != null && abi.contains("arm64")) ? "aarch64" : "armv7l";
-            if (hasM) {
-                return new CommandRequest(arch + "\n");
-            }
-            if (hasA) {
-                return new CommandRequest("Linux localhost 5.15.0 #1 SMP PREEMPT " + arch + "\n");
-            }
-            return new CommandRequest("Linux\n");
-        }
-
-        if ("cat".equals(first) && parts.length >= 2) {
-            String path = parts[1];
-            CommandRequest catReq = handleCatCommand(path);
-            if (catReq != null) return catReq;
-        }
-        return null;
+        return parseRequest(Arrays.asList(parts));
     }
 
     private static CommandRequest handleCatCommand(String path) {
@@ -241,18 +216,17 @@ public final class GetPropHooks {
 
     private static Process buildReplacementProcess(Process originalProcess, CommandRequest request, String packageName) {
         if (!request.isGetProp) {
-            readStream(originalProcess.getInputStream());
-            readStream(originalProcess.getErrorStream());
-            waitForExit(originalProcess);
-            return new SimpleProcess(request.staticOutput != null ? request.staticOutput : "\n", "", 0);
+            return RewritingProcess.replaceOutput(originalProcess,
+                request.staticOutput != null ? request.staticOutput : "\n");
         }
 
         if (request.fullDump) {
-            String originalStdout = readStream(originalProcess.getInputStream());
-            String originalStderr = readStream(originalProcess.getErrorStream());
-            int exitCode = waitForExit(originalProcess);
-            String rewritten = rewriteGetPropDump(originalStdout, packageName);
-            return new SimpleProcess(rewritten, originalStderr, exitCode);
+            Map<String, String> spoofed = new LinkedHashMap<>(ConfigManager.getEffectiveSystemProperties());
+            if (ConfigManager.shouldBypassVersionSpoof(packageName)) {
+                spoofed.entrySet().removeIf(entry -> isVersionProperty(entry.getKey()));
+            }
+            return new RewritingProcess(originalProcess,
+                new GetPropOutputRewriter(spoofed, ConfigManager::isHostLeakProperty));
         }
 
         String key = request.propertyKey;
@@ -271,88 +245,8 @@ public final class GetPropHooks {
             return null;
         }
 
-        readStream(originalProcess.getInputStream());
-        String originalStderr = readStream(originalProcess.getErrorStream());
-        int exitCode = waitForExit(originalProcess);
-        return new SimpleProcess(spoofedValue + "\n", originalStderr, exitCode);
-    }
-
-    private static String rewriteGetPropDump(String stdout, String packageName) {
-        Map<String, String> spoofed = new LinkedHashMap<>(ConfigManager.getEffectiveSystemProperties());
-        if (ConfigManager.shouldBypassVersionSpoof(packageName)) {
-            spoofed.entrySet().removeIf(entry -> isVersionProperty(entry.getKey()));
-        }
-        if (spoofed.isEmpty()) {
-            return stdout;
-        }
-
-        Map<String, String> merged = new LinkedHashMap<>();
-        if (stdout != null && !stdout.isEmpty()) {
-            List<String> lines = Arrays.asList(stdout.split("\\r?\\n"));
-            for (String line : lines) {
-                ParsedProperty parsed = parsePropertyLine(line);
-                if (parsed == null) {
-                    continue;
-                }
-                merged.put(parsed.key, parsed.value);
-            }
-        }
-
-        merged.entrySet().removeIf(entry -> ConfigManager.isHostLeakProperty(entry.getKey()));
-        merged.putAll(spoofed);
-
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, String> entry : merged.entrySet()) {
-            builder.append('[')
-                .append(entry.getKey())
-                .append("]: [")
-                .append(entry.getValue() == null ? "" : entry.getValue())
-                .append("]\n");
-        }
-        return builder.toString();
-    }
-
-    private static ParsedProperty parsePropertyLine(String line) {
-        if (line == null) {
-            return null;
-        }
-        String trimmed = line.trim();
-        if (!trimmed.startsWith("[") || !trimmed.contains("]: [") || !trimmed.endsWith("]")) {
-            return null;
-        }
-        int middle = trimmed.indexOf("]: [");
-        if (middle <= 1) {
-            return null;
-        }
-        String key = trimmed.substring(1, middle);
-        String value = trimmed.substring(middle + 4, trimmed.length() - 1);
-        return new ParsedProperty(key, value);
-    }
-
-    private static String readStream(InputStream inputStream) {
-        if (inputStream == null) {
-            return "";
-        }
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = inputStream.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
-            return output.toString(StandardCharsets.UTF_8.name());
-        } catch (IOException ignored) {
-            return "";
-        }
-    }
-
-    private static int waitForExit(Process process) {
-        try {
-            return process.waitFor();
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-            return 0;
-        }
+        String replacementOutput = spoofedValue + "\n";
+        return RewritingProcess.replaceOutput(originalProcess, replacementOutput);
     }
 
     private static String leafName(String value) {
@@ -392,55 +286,4 @@ public final class GetPropHooks {
         }
     }
 
-    private static final class ParsedProperty {
-        final String key;
-        final String value;
-
-        ParsedProperty(String key, String value) {
-            this.key = key;
-            this.value = value;
-        }
-    }
-
-    private static final class SimpleProcess extends Process {
-        private final ByteArrayInputStream inputStream;
-        private final ByteArrayInputStream errorStream;
-        private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        private final int exitCode;
-
-        SimpleProcess(String stdout, String stderr, int exitCode) {
-            this.inputStream = new ByteArrayInputStream((stdout == null ? "" : stdout).getBytes(StandardCharsets.UTF_8));
-            this.errorStream = new ByteArrayInputStream((stderr == null ? "" : stderr).getBytes(StandardCharsets.UTF_8));
-            this.exitCode = exitCode;
-        }
-
-        @Override
-        public OutputStream getOutputStream() {
-            return outputStream;
-        }
-
-        @Override
-        public InputStream getInputStream() {
-            return inputStream;
-        }
-
-        @Override
-        public InputStream getErrorStream() {
-            return errorStream;
-        }
-
-        @Override
-        public int waitFor() {
-            return exitCode;
-        }
-
-        @Override
-        public int exitValue() {
-            return exitCode;
-        }
-
-        @Override
-        public void destroy() {
-        }
-    }
 }

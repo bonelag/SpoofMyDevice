@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 
 import com.devicespooflab.hooks.hooks.AdvertisingIdHooks;
 import com.devicespooflab.hooks.hooks.AppSetIdHooks;
@@ -25,9 +27,15 @@ import com.devicespooflab.hooks.hooks.TelephonyHooks;
 import com.devicespooflab.hooks.hooks.VendorSystemPropertiesHooks;
 import com.devicespooflab.hooks.hooks.WebViewHooks;
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.HookSafetyPolicy;
 
+import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -51,73 +59,36 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final int REAL_SDK_INT = Build.VERSION.SDK_INT;
     private static final Set<String> INITIALIZED_HOOK_PROCESSES = ConcurrentHashMap.newKeySet();
     private static final Set<String> CONFIG_RECEIVER_PROCESSES = ConcurrentHashMap.newKeySet();
+    private static final Map<String, HookSession> HOOK_SESSIONS = new ConcurrentHashMap<>();
 
-    /**
-     * Do not touch any process during the early boot window.
-     *
-     * Before sys.boot_completed=1, system_server, SystemUI and the package manager are
-     * still serializing app startup behind their internal locks. Any blocking IPC from a
-     * hooked app back into the module app (ContentProvider call / ordered broadcast) can
-     * stall that startup and leave bootanimation stuck for its full 55s watchdog period,
-     * after which SurfaceFlinger force-kills it (MediaTek mutex abort) and the UI stays
-     * black. Keeping the module fully dormant until the boot completes is what makes
-     * soft reboots with SMD enabled safe on OriginOS.
-     */
-    private static volatile boolean bootCompleted = false;
-
-    private static boolean isBootCompleted() {
-        if (bootCompleted) {
-            return true;
-        }
+    private static boolean isBootReady() {
         try {
-            Class<?> sysPropClass = XposedHelpers.findClassIfExists(
-                "android.os.SystemProperties", MainHook.class.getClassLoader());
-            if (sysPropClass != null) {
-                Object v = XposedHelpers.callStaticMethod(
-                    sysPropClass, "get", "sys.boot_completed");
-                if (v != null && !v.toString().isEmpty() && !"0".equals(v.toString())) {
-                    bootCompleted = true;
-                    return true;
-                }
-            }
+            // Read fresh, original properties. Never trust a cached true value or our own hooks.
+            Method getter = BootPropertyReader.GETTER;
+            String completed = (String) XposedBridge.invokeOriginalMethod(
+                getter, null, new Object[]{"sys.boot_completed"});
+            String animation = (String) XposedBridge.invokeOriginalMethod(
+                getter, null, new Object[]{"init.svc.bootanim"});
+            return HookSafetyPolicy.isBootReady(completed, animation);
         } catch (Throwable ignored) {
+            return false;
         }
-        return false;
     }
 
-    private static boolean isSystemCriticalPackage(String packageName) {
-        if (packageName == null || packageName.isEmpty()) {
+    private static boolean isSystemCriticalPackage(XC_LoadPackage.LoadPackageParam lpparam) {
+        if (lpparam.appInfo == null) {
             return true;
         }
         try {
-            if (android.os.Process.myUid() < 10000) {
-                return true;
-            }
+            return HookSafetyPolicy.isProtectedProcess(
+                lpparam.packageName,
+                lpparam.processName,
+                android.os.Process.myUid(),
+                lpparam.appInfo.flags
+            );
         } catch (Throwable ignored) {
-        }
-        if ("android".equals(packageName)
-            || "system".equals(packageName)
-            || "system_server".equals(packageName)
-            || "com.android.systemui".equals(packageName)
-            || packageName.startsWith("org.lsposed.")
-            || packageName.startsWith("me.weishu.kernelsu")
-            || packageName.startsWith("io.github.a13e300.ksu")
-            || packageName.startsWith("com.topjohnwu.magisk")
-            || packageName.contains(".launcher")
-            || packageName.startsWith("com.bbk.launcher")
-            || packageName.startsWith("com.vivo.upslide")
-            || packageName.startsWith("com.vivo.daemonService")
-            || packageName.startsWith("com.vivo.fingerprint")
-            || packageName.startsWith("com.vivo.ambient")
-            || packageName.startsWith("com.vivo.secime")
-            || packageName.contains("inputmethod")
-            || packageName.startsWith("com.google.android.inputmethod")
-            || packageName.startsWith("com.android.server")
-            || packageName.startsWith("com.android.keyguard")
-            || packageName.startsWith("com.android.wallpaper")) {
             return true;
         }
-        return false;
     }
 
     @Override
@@ -127,37 +98,25 @@ public class MainHook implements IXposedHookLoadPackage {
             return;
         }
 
-        if (isSystemCriticalPackage(lpparam.packageName)) {
-            XposedBridge.log(TAG + ": Skipping system critical package " + lpparam.packageName);
+        // A package loaded by another app or a system host must not configure that process.
+        if (!lpparam.isFirstApplication || isSystemCriticalPackage(lpparam)) {
             return;
         }
 
-        // Do not run any module work during early boot. See isBootCompleted().
-        if (!isBootCompleted()) {
-            XposedBridge.log(TAG + ": Boot not completed, deferring hooks for " + lpparam.packageName);
-            // Still arm the Application.attach path so hooks are applied the moment
-            // the system is ready, but the attach path itself re-checks the flag.
-            hookApplicationAttachForInitialization(lpparam);
+        // No preferences, providers, workers, or Application hooks during boot.
+        // Apps launched in this window keep real values until their next process start.
+        if (!isBootReady()) {
             return;
         }
 
-        XposedBridge.log(TAG + ": Loading hooks for " + lpparam.packageName);
-        hookApplicationAttachForInitialization(lpparam);
-
-        try {
-            ConfigManager.init(lpparam.packageName);
-            if (!ConfigManager.hasAssignedProfile()) {
-                XposedBridge.log(TAG + ": Profile unavailable before Application.attach; deferring hooks for " + lpparam.packageName);
-                return;
-            }
-            XposedBridge.log(TAG + ": Config initialized successfully");
-        } catch (Exception exception) {
-            XposedBridge.log(TAG + ": Failed to init config: " + exception.getMessage());
-            exception.printStackTrace();
+        String processName = lpparam.processName == null ? lpparam.packageName : lpparam.processName;
+        HookSession session = new HookSession(lpparam);
+        if (HOOK_SESSIONS.putIfAbsent(processName, session) != null) {
             return;
         }
-
-        initializeHooks(lpparam);
+        ConfigManager.init(lpparam.packageName);
+        hookApplicationAttachForInitialization(lpparam, session);
+        session.requestReload();
     }
 
     private void initializeHooks(XC_LoadPackage.LoadPackageParam lpparam) {
@@ -165,6 +124,9 @@ public class MainHook implements IXposedHookLoadPackage {
         if (!INITIALIZED_HOOK_PROCESSES.add(processName)) {
             return;
         }
+
+        // Capture real fields before SystemProperties hooks can affect Build initialization.
+        BuildHooks.captureOriginals(lpparam.classLoader);
 
         try {
             SystemPropertiesHooks.hook(lpparam);
@@ -193,15 +155,6 @@ public class MainHook implements IXposedHookLoadPackage {
         } catch (Exception exception) {
             XposedBridge.log(TAG + ": GetPropHooks failed: " + exception.getMessage());
         }
-
-        try {
-            BuildHooks.hook(lpparam);
-            XposedBridge.log(TAG + ": BuildHooks loaded");
-        } catch (Exception exception) {
-            XposedBridge.log(TAG + ": BuildHooks failed: " + exception.getMessage());
-        }
-
-        hookActivityLifecycleForReapply(lpparam);
 
         try {
             LocaleHooks.hook(lpparam);
@@ -289,10 +242,16 @@ public class MainHook implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + ": PackageManagerHooks failed: " + exception.getMessage());
         }
 
+        // Resolve/install other hooks using the real Android version first.
+        BuildHooks.hook(lpparam);
+
         XposedBridge.log(TAG + ": All hooks initialized for " + lpparam.packageName);
     }
 
-    private void hookApplicationAttachForInitialization(XC_LoadPackage.LoadPackageParam lpparam) {
+    private void hookApplicationAttachForInitialization(
+        XC_LoadPackage.LoadPackageParam lpparam,
+        HookSession session
+    ) {
         try {
             XposedHelpers.findAndHookMethod(
                 "android.app.Application",
@@ -302,25 +261,18 @@ public class MainHook implements IXposedHookLoadPackage {
                 new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
-                        // Never run config work while the system is still booting.
-                        // Application.attach of early-start components happens before
-                        // sys.boot_completed=1; touching ContentProviders/broadcasts here
-                        // risks the boot stall described in isBootCompleted().
-                        if (!isBootCompleted()) {
-                            XposedBridge.log(TAG + ": Boot not completed, skipping attach init for " + lpparam.packageName);
+                        if (!isBootReady()) {
                             return;
                         }
                         try {
                             Context context = (Context) param.args[0];
-                            ConfigManager.forceReload(context);
-                            registerConfigChangeReceiver(context, lpparam);
-                            if (!ConfigManager.hasAssignedProfile()) {
-                                XposedBridge.log(TAG + ": No profile assigned after Application.attach for " + lpparam.packageName);
+                            if (!lpparam.packageName.equals(context.getPackageName())) {
                                 return;
                             }
-                            initializeHooks(lpparam);
-                            BuildHooks.reapply(context.getClassLoader(), lpparam.packageName);
-                            XposedBridge.log(TAG + ": Profile loaded after Application.attach for " + lpparam.packageName);
+                            session.context = context;
+                            // Prefetch may already have finished. This reads memory only.
+                            session.applyCurrentConfig();
+                            session.requestReload();
                         } catch (Throwable throwable) {
                             XposedBridge.log(TAG + ": Failed to initialize hooks after attach for " + lpparam.packageName + ": " + throwable.getMessage());
                         }
@@ -333,7 +285,8 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerConfigChangeReceiver(Context context, XC_LoadPackage.LoadPackageParam lpparam) {
+    private void registerConfigChangeReceiver(Context context, HookSession session) {
+        XC_LoadPackage.LoadPackageParam lpparam = session.lpparam;
         String processName = lpparam.processName == null ? lpparam.packageName : lpparam.processName;
         if (!CONFIG_RECEIVER_PROCESSES.add(processName)) {
             return;
@@ -345,56 +298,124 @@ public class MainHook implements IXposedHookLoadPackage {
                 if (intent == null || !ConfigManager.ACTION_CONFIG_CHANGED.equals(intent.getAction())) {
                     return;
                 }
-                ConfigManager.forceReload(receiverContext);
-                if (!ConfigManager.hasAssignedProfile()) {
-                    return;
-                }
-                initializeHooks(lpparam);
-                BuildHooks.reapply(receiverContext.getClassLoader(), lpparam.packageName);
+                // Return to Android immediately; do not start the provider while handling a broadcast.
+                session.requestReload();
             }
         };
 
-        IntentFilter filter = new IntentFilter(ConfigManager.ACTION_CONFIG_CHANGED);
-        if (REAL_SDK_INT >= 33) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
-        } else {
-            context.registerReceiver(receiver, filter);
+        try {
+            IntentFilter filter = new IntentFilter(ConfigManager.ACTION_CONFIG_CHANGED);
+            if (REAL_SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                context.registerReceiver(receiver, filter);
+            }
+        } catch (Throwable throwable) {
+            CONFIG_RECEIVER_PROCESSES.remove(processName);
+            XposedBridge.log(TAG + ": Config receiver registration failed for "
+                + lpparam.packageName + ": " + throwable);
         }
     }
 
-    private void hookActivityLifecycleForReapply(XC_LoadPackage.LoadPackageParam lpparam) {
-        if (lpparam.classLoader == null) {
-            return;
+    private final class HookSession {
+        private final XC_LoadPackage.LoadPackageParam lpparam;
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
+        private final AtomicBoolean reloadRequested = new AtomicBoolean();
+        private final AtomicBoolean reloadRunning = new AtomicBoolean();
+        private volatile Context context;
+
+        private HookSession(XC_LoadPackage.LoadPackageParam lpparam) {
+            this.lpparam = lpparam;
         }
-        try {
-            XposedHelpers.findAndHookMethod(
-                "android.app.Activity",
-                lpparam.classLoader,
-                "onCreate",
-                android.os.Bundle.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        try {
-                            if (!ConfigManager.isUsingEmbeddedDefaults()) {
-                                return;
-                            }
-                            android.app.Activity activity = (android.app.Activity) param.thisObject;
-                            ConfigManager.forceReload(activity);
-                            BuildHooks.reapply(activity.getClassLoader(), lpparam.packageName);
-                        } catch (Throwable ignored) {
-                        }
+
+        private void requestReload() {
+            if (!isBootReady()) {
+                return;
+            }
+            reloadRequested.set(true);
+            if (reloadRunning.compareAndSet(false, true)) {
+                ConfigWorker.EXECUTOR.execute(this::reloadOnWorker);
+            }
+        }
+
+        private void reloadOnWorker() {
+            try {
+                do {
+                    reloadRequested.set(false);
+                    if (!isBootReady()) {
+                        return;
                     }
+                    try {
+                        Context attachedContext = context;
+                        if (attachedContext != null) {
+                            registerConfigChangeReceiver(attachedContext, this);
+                        }
+                        if (ConfigManager.forceReload(attachedContext)) {
+                            mainHandler.post(this::applyCurrentConfig);
+                        }
+                    } catch (Throwable throwable) {
+                        XposedBridge.log(TAG + ": Background config load failed for "
+                            + lpparam.packageName + ": " + throwable);
+                    }
+                } while (reloadRequested.get());
+            } finally {
+                reloadRunning.set(false);
+                // Cover a change arriving between the final check and releasing the worker.
+                if (reloadRequested.get()) {
+                    requestReload();
                 }
-            );
-        } catch (Throwable ignored) {
+            }
+        }
+
+        private void applyCurrentConfig() {
+            Context attachedContext = context;
+            if (attachedContext == null || !isBootReady()) {
+                return;
+            }
+            try {
+                if (ConfigManager.hasAssignedProfile()) {
+                    initializeHooks(lpparam);
+                }
+                String processName = lpparam.processName == null ? lpparam.packageName : lpparam.processName;
+                if (INITIALIZED_HOOK_PROCESSES.contains(processName)) {
+                    // Also restore original Build fields when a profile is removed.
+                    BuildHooks.reapply(lpparam.classLoader, lpparam.packageName);
+                }
+            } catch (Throwable throwable) {
+                XposedBridge.log(TAG + ": Applying cached config failed for "
+                    + lpparam.packageName + ": " + throwable);
+            }
+        }
+    }
+
+    private static final class ConfigWorker {
+        // Lazy holder: no worker is created when LSPosed loads MainHook during boot.
+        private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(task -> {
+            Thread thread = new Thread(task, "spoofmydevice-config");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    private static final class BootPropertyReader {
+        private static final Method GETTER = findGetter();
+
+        private static Method findGetter() {
+            try {
+                Class<?> properties = Class.forName("android.os.SystemProperties");
+                Method getter = properties.getDeclaredMethod("get", String.class);
+                getter.setAccessible(true);
+                return getter;
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Original boot properties unavailable", exception);
+            }
         }
     }
 
     private void hookActivationCheck(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(
-                MainActivity.class.getName(),
+                "com.devicespooflab.hooks.MainActivity",
                 lpparam.classLoader,
                 "isModuleActivated",
                 XC_MethodReplacement.returnConstant(true)

@@ -220,4 +220,42 @@
     <string-array name="xposed_scope">
         <item>com.spoofmydevice</item>
     </string-array>
+
+    <!-- Profile tabs and additional hardware fields -->
+    <string name="tab_soc">SoC</string>
+    <string name="tab_system">系统</string>
+    <string name="tab_screen">屏幕</string>
+    <string name="tab_network">网络</string>
+    <string name="tab_identifiers">标识符</string>
+    <string name="settings_field_soc_model">SoC 型号</string>
+    <string name="settings_field_soc_manufacturer">SoC 制造商</string>
+    <string name="settings_field_cpu_abi">主要 CPU ABI</string>
+    <string name="settings_field_cpu_abi_list">支持的 ABI</string>
+    <string name="settings_field_cpu_abi_list_64">64 位 ABI</string>
+    <string name="settings_field_cpu_abi_list_32">32 位 ABI</string>
+    <string name="settings_field_bootloader">引导加载程序</string>
+    <string name="settings_field_baseband">基带 / 调制解调器</string>
+    <string name="settings_field_build_user">构建用户</string>
+    <string name="settings_field_build_host">构建主机</string>
+    <string name="settings_field_build_date">构建日期</string>
+    <string name="settings_field_build_date_utc">构建日期（UTC 时间戳）</string>
+    <string name="settings_field_build_description">构建描述</string>
+    <string name="settings_field_build_flavor">构建变体</string>
+    <string name="settings_field_build_product">构建产品</string>
+    <string name="settings_field_build_characteristics">构建特性</string>
+    <string name="settings_field_serial_number">序列号</string>
+    <string name="settings_field_gnss_model">GNSS / GPS 型号</string>
+    <string name="settings_field_gnss_year">GNSS 硬件年份</string>
+    <string name="settings_field_user_agent">WebView 用户代理</string>
+    <string name="settings_field_sim_operator_name">SIM 运营商名称</string>
+    <string name="settings_field_sim_operator_numeric">SIM 运营商代码</string>
+    <string name="settings_field_gpu_vendor">GPU 厂商</string>
+    <string name="settings_field_gpu_renderer">GPU 渲染器</string>
+    <string name="settings_field_gl_version">OpenGL ES 版本</string>
+    <string name="settings_field_glsl_version">GLSL 版本</string>
+    <string name="settings_field_vulkan_version">Vulkan 版本</string>
+    <string name="settings_field_vulkan_driver_version">Vulkan 驱动版本</string>
+    <string name="settings_field_vulkan_level">Vulkan 级别</string>
+    <string name="settings_field_cpu_hardware">CPU 硬件</string>
+    <string name="settings_field_cpu_cores">CPU 核心数</string>
 </resources>

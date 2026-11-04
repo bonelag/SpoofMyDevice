@@ -216,4 +216,42 @@
     <string name="safe_mode_selected_count">%1$d개 선택됨</string>
     <string name="safe_mode_dont_show_again">다시 보지 않기</string>
     <string name="safe_mode_more_options">더보기</string>
+
+    <!-- Profile tabs and additional hardware fields -->
+    <string name="tab_soc">SoC</string>
+    <string name="tab_system">시스템</string>
+    <string name="tab_screen">화면</string>
+    <string name="tab_network">네트워크</string>
+    <string name="tab_identifiers">식별자</string>
+    <string name="settings_field_soc_model">SoC 모델</string>
+    <string name="settings_field_soc_manufacturer">SoC 제조사</string>
+    <string name="settings_field_cpu_abi">기본 CPU ABI</string>
+    <string name="settings_field_cpu_abi_list">지원 ABI</string>
+    <string name="settings_field_cpu_abi_list_64">64비트 ABI</string>
+    <string name="settings_field_cpu_abi_list_32">32비트 ABI</string>
+    <string name="settings_field_bootloader">부트로더</string>
+    <string name="settings_field_baseband">베이스밴드 / 모뎀</string>
+    <string name="settings_field_build_user">빌드 사용자</string>
+    <string name="settings_field_build_host">빌드 호스트</string>
+    <string name="settings_field_build_date">빌드 날짜</string>
+    <string name="settings_field_build_date_utc">빌드 날짜 (UTC 타임스탬프)</string>
+    <string name="settings_field_build_description">빌드 설명</string>
+    <string name="settings_field_build_flavor">빌드 변형</string>
+    <string name="settings_field_build_product">빌드 제품</string>
+    <string name="settings_field_build_characteristics">빌드 특성</string>
+    <string name="settings_field_serial_number">일련번호</string>
+    <string name="settings_field_gnss_model">GNSS / GPS 모델</string>
+    <string name="settings_field_gnss_year">GNSS 하드웨어 연도</string>
+    <string name="settings_field_user_agent">WebView User-Agent</string>
+    <string name="settings_field_sim_operator_name">SIM 통신사 이름</string>
+    <string name="settings_field_sim_operator_numeric">SIM 통신사 코드</string>
+    <string name="settings_field_gpu_vendor">GPU 제조사</string>
+    <string name="settings_field_gpu_renderer">GPU 렌더러</string>
+    <string name="settings_field_gl_version">OpenGL ES 버전</string>
+    <string name="settings_field_glsl_version">GLSL 버전</string>
+    <string name="settings_field_vulkan_version">Vulkan 버전</string>
+    <string name="settings_field_vulkan_driver_version">Vulkan 드라이버 버전</string>
+    <string name="settings_field_vulkan_level">Vulkan 레벨</string>
+    <string name="settings_field_cpu_hardware">CPU 하드웨어</string>
+    <string name="settings_field_cpu_cores">CPU 코어 수</string>
 </resources>

@@ -1,44 +1,29 @@
 package com.devicespooflab.hooks.utils;
 
 import android.content.Context;
-import android.content.Intent;
-import android.content.BroadcastReceiver;
 import android.os.Bundle;
-import android.database.Cursor;
-import android.net.Uri;
-import android.os.SystemClock;
-import android.os.Handler;
-import android.os.HandlerThread;
 
 import com.devicespooflab.hooks.ConfigProvider;
-import com.devicespooflab.hooks.ConfigBridgeReceiver;
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import de.robv.android.xposed.XSharedPreferences;
 import de.robv.android.xposed.XposedBridge;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 /**
  * Manages configuration for spoofed values.
  *
- * Target processes request the profile assigned to their package through the exported
- * config provider. Packages without an assignment are left unhooked by MainHook.
+ * Target processes load profiles on MainHook's background worker. Hook callbacks read
+ * only immutable, already published snapshots; they never reload or perform IPC.
  */
 public class ConfigManager {
 
@@ -122,70 +107,42 @@ public class ConfigManager {
     public static final String FIELD_CPU_HARDWARE = "cpu_hardware";
     public static final String FIELD_CPU_CORES = "cpu_cores";
 
-    private static final long RETRY_INTERVAL_MS = 1500L;
+    private static final RuntimeConfigStore STORE = new RuntimeConfigStore(
+        new RuntimeConfigStore.Snapshot(getEmbeddedDefaults(), true)
+    );
+    private static volatile String targetPackageName;
+    private static final int MAX_PROFILE_BYTES = 4 * 1024 * 1024;
 
-    private static Map<String, String> allProperties = null;
-    private static boolean usingEmbeddedDefaults = true;
-    private static boolean assignedProfile = false;
-    private static String targetPackageName = null;
-    private static long lastReloadAttemptElapsed = 0L;
-
-    public static synchronized void init(String packageName) {
+    /** Sets the target only. Preference and provider reads must run on the config worker. */
+    public static void init(String packageName) {
         targetPackageName = packageName;
-        reload(false);
     }
 
-    public static synchronized void forceReload() {
-        reload(true, null);
+    public static boolean forceReload() {
+        return forceReload(null);
     }
 
-    public static synchronized void forceReload(Context context) {
-        reload(true, context);
+    /** Caller must be a background worker, never Application.attach or a hook callback. */
+    public static boolean forceReload(Context context) {
+        return STORE.reload(() -> readConfig(context));
     }
 
-    public static synchronized boolean isUsingEmbeddedDefaults() {
-        ensureFreshConfig();
-        return usingEmbeddedDefaults;
+    public static boolean isUsingEmbeddedDefaults() {
+        return STORE.current().fromEmbeddedDefaults;
     }
 
-    public static synchronized boolean hasAssignedProfile() {
-        ensureFreshConfig();
-        return assignedProfile;
+    public static boolean hasAssignedProfile() {
+        return STORE.current().hasAssignedProfile();
     }
 
-    private static void reload(boolean force) {
-        reload(force, null);
-    }
-
-    private static void reload(boolean force, Context context) {
-        long now = SystemClock.elapsedRealtime();
-        if (!force && allProperties != null && !usingEmbeddedDefaults) {
-            return;
-        }
-        if (!force && allProperties != null && usingEmbeddedDefaults && (now - lastReloadAttemptElapsed) < RETRY_INTERVAL_MS) {
-            return;
-        }
-
-        lastReloadAttemptElapsed = now;
-        LoadedProperties loadedProperties = readConfig(context);
-        allProperties = loadedProperties.properties;
-        usingEmbeddedDefaults = loadedProperties.fromEmbeddedDefaults;
-        assignedProfile = !usingEmbeddedDefaults && !allProperties.isEmpty();
-        resetGeneratedCaches();
-    }
-
-    private static void ensureFreshConfig() {
-        if (allProperties == null || usingEmbeddedDefaults) {
-            reload(false);
-        }
-    }
-
-    private static LoadedProperties readConfig(Context preferredContext) {
-        // 1. Try XSharedPreferences first (standard Xposed mechanism, works without Context at handleLoadPackage time)
+    private static RuntimeConfigStore.Snapshot readConfig(Context preferredContext) {
+        String packageName = targetPackageName;
+        boolean allowDefault = !isSystemPackage(packageName);
+        // All transports run on the worker, even XSharedPreferences constructors/getters.
         try {
-            Map<String, String> configFromXsp = readFromXSharedPrefs();
-            if (!configFromXsp.isEmpty()) {
-                return new LoadedProperties(configFromXsp, false);
+            RuntimeConfigStore.Snapshot configFromXsp = readFromXSharedPrefs(packageName, allowDefault);
+            if (configFromXsp != null) {
+                return configFromXsp;
             }
         } catch (Throwable t) {
             XposedBridge.log("SpoofMyDevice: readFromXSharedPrefs failed: " + t.getMessage());
@@ -193,9 +150,9 @@ public class ConfigManager {
 
         // 2. Try direct file read
         try {
-            Map<String, String> configFromDisk = readFromDirectFiles();
-            if (!configFromDisk.isEmpty()) {
-                return new LoadedProperties(configFromDisk, false);
+            RuntimeConfigStore.Snapshot configFromDisk = readFromDirectFiles(packageName, allowDefault);
+            if (configFromDisk != null) {
+                return configFromDisk;
             }
         } catch (Throwable t) {
             XposedBridge.log("SpoofMyDevice: readFromDirectFiles failed: " + t.getMessage());
@@ -203,25 +160,23 @@ public class ConfigManager {
 
         // 3. Try ContentProvider
         try {
-            Map<String, String> configFromProvider = readFromProvider(preferredContext);
-            if (!configFromProvider.isEmpty()) {
-                return new LoadedProperties(configFromProvider, false);
+            RuntimeConfigStore.Snapshot configFromProvider = readFromProvider(preferredContext, packageName, allowDefault);
+            if (configFromProvider != null) {
+                return configFromProvider;
             }
         } catch (Throwable t) {
             XposedBridge.log("SpoofMyDevice: readFromProvider failed: " + t.getMessage());
         }
 
-        return new LoadedProperties(getEmbeddedDefaults(), true);
+        return null;
     }
 
-    private static Map<String, String> readFromXSharedPrefs() {
+    private static RuntimeConfigStore.Snapshot readFromXSharedPrefs(String packageName, boolean allowDefault) {
         // Candidate 1: standard module preferences
         try {
             XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice", "app_profiles");
-            xsp.reload();
-
-            Map<String, String> result = extractFromXsp(xsp, "app_profiles");
-            if (!result.isEmpty()) {
+            RuntimeConfigStore.Snapshot result = extractFromXsp(xsp, packageName, allowDefault, "app_profiles");
+            if (result != null) {
                 return result;
             }
         } catch (Throwable t) {
@@ -231,57 +186,31 @@ public class ConfigManager {
         // Candidate 2: default preferences name
         try {
             XSharedPreferences xsp = new XSharedPreferences("com.spoofmydevice");
-            xsp.reload();
-
-            Map<String, String> result = extractFromXsp(xsp, "default");
-            if (!result.isEmpty()) {
+            RuntimeConfigStore.Snapshot result = extractFromXsp(xsp, packageName, allowDefault, "default");
+            if (result != null) {
                 return result;
             }
         } catch (Throwable t) {
             XposedBridge.log("SpoofMyDevice: XSP default error: " + t);
         }
 
-        return Collections.emptyMap();
+        return null;
     }
 
-    private static Map<String, String> extractFromXsp(XSharedPreferences xsp, String label) {
-        if (targetPackageName != null) {
-            String pkgConfig = xsp.getString("pkg_" + targetPackageName, null);
-            if (pkgConfig != null && !pkgConfig.trim().isEmpty()) {
-                InputStream stream = new java.io.ByteArrayInputStream(pkgConfig.getBytes(StandardCharsets.UTF_8));
-                Map<String, String> parsed = parseConfigStream(stream);
-                if (!parsed.isEmpty()) {
-                    XposedBridge.log("SpoofMyDevice: Loaded package profile via XSharedPreferences (" + label + ") for " + targetPackageName);
-                    return parsed;
-                }
-            }
+    private static RuntimeConfigStore.Snapshot extractFromXsp(
+        XSharedPreferences xsp, String packageName, boolean allowDefault, String label
+    ) {
+        RuntimeConfigStore.Snapshot result = ProfileConfigResolver.resolvePreferences(
+            xsp.getAll(), packageName, allowDefault
+        );
+        if (result != null) {
+            XposedBridge.log("SpoofMyDevice: Loaded profile state via XSharedPreferences ("
+                + label + ") for " + packageName + ", assigned=" + result.hasAssignedProfile());
         }
-
-        if (!isSystemPackage(targetPackageName)) {
-            String defConfig = xsp.getString("default_config", null);
-            if (defConfig != null && !defConfig.trim().isEmpty()) {
-                InputStream stream = new java.io.ByteArrayInputStream(defConfig.getBytes(StandardCharsets.UTF_8));
-                Map<String, String> parsed = parseConfigStream(stream);
-                if (!parsed.isEmpty()) {
-                    XposedBridge.log("SpoofMyDevice: Loaded default profile via XSharedPreferences (" + label + ") for " + targetPackageName);
-                    return parsed;
-                }
-            }
-        }
-
-        String jsonState = xsp.getString("json_state", null);
-        if (jsonState != null && !jsonState.trim().isEmpty()) {
-            Map<String, String> parsed = resolveConfigFromJson(jsonState, targetPackageName);
-            if (!parsed.isEmpty()) {
-                XposedBridge.log("SpoofMyDevice: Resolved profile from json_state in XSharedPreferences (" + label + ") for " + targetPackageName);
-                return parsed;
-            }
-        }
-
-        return Collections.emptyMap();
+        return result;
     }
 
-    private static Map<String, String> readFromDirectFiles() {
+    private static RuntimeConfigStore.Snapshot readFromDirectFiles(String packageName, boolean allowDefault) {
         String[] paths = new String[]{
             "/data/local/tmp/spoofmydevice/app_profiles.json",
             "/data/user_de/0/com.spoofmydevice/files/app_profiles.json",
@@ -291,18 +220,23 @@ public class ConfigManager {
         for (String path : paths) {
             try {
                 File file = new File(path);
-                XposedBridge.log("SpoofMyDevice: Check file " + path + ": exists=" + file.exists() + " canRead=" + file.canRead());
-                if (file.exists() && file.canRead()) {
+                if (file.exists() && file.canRead() && file.length() <= MAX_PROFILE_BYTES) {
                     try (FileInputStream fis = new FileInputStream(file)) {
-                        byte[] bytes = new byte[(int) file.length()];
-                        int read = fis.read(bytes);
-                        if (read > 0) {
-                            String json = new String(bytes, 0, read, StandardCharsets.UTF_8);
-                            Map<String, String> parsed = resolveConfigFromJson(json, targetPackageName);
-                            if (!parsed.isEmpty()) {
-                                XposedBridge.log("SpoofMyDevice: Loaded profile from direct file " + path + " for " + targetPackageName);
-                                return parsed;
+                        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[4096];
+                        int count;
+                        while ((count = fis.read(buffer)) != -1) {
+                            if (bytes.size() + count > MAX_PROFILE_BYTES) {
+                                throw new IllegalStateException("Profile state exceeds size limit");
                             }
+                            bytes.write(buffer, 0, count);
+                        }
+                        RuntimeConfigStore.Snapshot parsed = ProfileConfigResolver.resolveJson(
+                            new String(bytes.toByteArray(), StandardCharsets.UTF_8), packageName, allowDefault
+                        );
+                        if (parsed != null) {
+                            XposedBridge.log("SpoofMyDevice: Loaded profile state from " + path + " for " + packageName);
+                            return parsed;
                         }
                     }
                 }
@@ -310,211 +244,36 @@ public class ConfigManager {
                 XposedBridge.log("SpoofMyDevice: Direct file error for " + path + ": " + t.getMessage());
             }
         }
-        return Collections.emptyMap();
+        return null;
     }
 
     public static boolean isSystemPackage(String packageName) {
-        if (packageName == null || packageName.isEmpty()) return true;
         try {
-            if (android.os.Process.myUid() < 10000) return true;
+            if (HookSafetyPolicy.isProtectedUid(android.os.Process.myUid())) return true;
         } catch (Throwable ignored) {
+            return true;
         }
-        return packageName.equals("android")
-            || packageName.equals("system")
-            || packageName.equals("system_server")
-            || packageName.equals("com.android.systemui")
-            || packageName.contains(".launcher")
-            || packageName.startsWith("com.bbk.launcher")
-            || packageName.startsWith("com.vivo.upslide")
-            || packageName.startsWith("com.vivo.daemonService")
-            || packageName.startsWith("com.vivo.fingerprint")
-            || packageName.startsWith("com.vivo.ambient")
-            || packageName.startsWith("com.vivo.secime")
-            || packageName.startsWith("org.lsposed.")
-            || packageName.startsWith("me.weishu.kernelsu")
-            || packageName.startsWith("io.github.a13e300.ksu");
+        return HookSafetyPolicy.isProtectedPackage(packageName);
     }
 
-    private static Map<String, String> resolveConfigFromJson(String json, String packageName) {
-        if (json == null || json.trim().isEmpty()) {
-            return Collections.emptyMap();
-        }
-        try {
-            JSONObject root = new JSONObject(json);
-            JSONObject assignments = root.optJSONObject("assignments");
-            JSONObject globalProps = root.optJSONObject("globalProperties");
-
-            String profileId = null;
-            if (assignments != null && packageName != null) {
-                profileId = assignments.optString(packageName, null);
-                if (profileId != null && profileId.isEmpty()) {
-                    profileId = null;
-                }
-            }
-            if (profileId == null && globalProps != null && !isSystemPackage(packageName)) {
-                profileId = globalProps.optString(KEY_DEFAULT_PROFILE_ID, null);
-                if (profileId != null && profileId.isEmpty()) {
-                    profileId = null;
-                }
-            }
-            if (profileId == null) {
-                return Collections.emptyMap();
-            }
-
-            JSONArray profiles = root.optJSONArray("profiles");
-            if (profiles == null) {
-                return Collections.emptyMap();
-            }
-            String content = null;
-            for (int i = 0; i < profiles.length(); i++) {
-                JSONObject prof = profiles.getJSONObject(i);
-                if (profileId.equals(prof.optString("id"))) {
-                    content = prof.optString("content");
-                    break;
-                }
-            }
-            if (content == null) {
-                return Collections.emptyMap();
-            }
-
-            StringBuilder sb = new StringBuilder(content);
-            if (globalProps != null) {
-                sb.append("\n\n# Global runtime options\n");
-                java.util.Iterator<String> keys = globalProps.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    sb.append(key).append('=').append(globalProps.optString(key)).append('\n');
-                }
-            }
-            InputStream stream = new java.io.ByteArrayInputStream(sb.toString().getBytes(StandardCharsets.UTF_8));
-            return parseConfigStream(stream);
-        } catch (Throwable t) {
-            return Collections.emptyMap();
-        }
-    }
-
-    private static Map<String, String> readFromProvider(Context preferredContext) {
-        if (preferredContext == null || isSystemPackage(targetPackageName)) {
-            return Collections.emptyMap();
+    private static RuntimeConfigStore.Snapshot readFromProvider(
+        Context preferredContext, String packageName, boolean allowDefault
+    ) {
+        if (preferredContext == null || isSystemPackage(packageName)) {
+            return null;
         }
         try {
             Bundle bundle = preferredContext.getContentResolver().call(
                 ConfigProvider.CONFIG_URI,
-                ConfigProvider.METHOD_GET_CONFIG,
-                targetPackageName,
+                ConfigProvider.METHOD_GET_STATE,
+                packageName,
                 null
             );
             if (bundle != null) {
                 String content = bundle.getString(ConfigProvider.COLUMN_CONTENT);
-                if (content != null && !content.trim().isEmpty()) {
-                    InputStream stream = new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-                    return parseConfigStream(stream);
-                }
+                return ProfileConfigResolver.resolveJson(content, packageName, allowDefault);
             }
         } catch (Throwable ignored) {
-        }
-        return Collections.emptyMap();
-    }
-
-    private static Map<String, String> readFromBridgeReceiver(Context preferredContext) {
-        Context context = preferredContext != null ? preferredContext : resolveAnyContext();
-        if (context == null) {
-            return new HashMap<>();
-        }
-        HandlerThread handlerThread = new HandlerThread("spoofmydevice-config-bridge");
-        try {
-            handlerThread.start();
-            Handler handler = new Handler(handlerThread.getLooper());
-            CountDownLatch latch = new CountDownLatch(1);
-            final String[] contentHolder = new String[1];
-
-            BroadcastReceiver resultReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context receiverContext, Intent intent) {
-                    Bundle resultExtras = getResultExtras(false);
-                    if (resultExtras != null) {
-                        contentHolder[0] = resultExtras.getString(ConfigBridgeReceiver.EXTRA_CONTENT);
-                    }
-                    latch.countDown();
-                }
-            };
-
-            Intent intent = new Intent(ConfigBridgeReceiver.ACTION_GET_CONFIG);
-            intent.setClassName("com.spoofmydevice", "com.devicespooflab.hooks.ConfigBridgeReceiver");
-            intent.putExtra(ConfigBridgeReceiver.EXTRA_PACKAGE_NAME, targetPackageName);
-            context.sendOrderedBroadcast(
-                intent,
-                null,
-                resultReceiver,
-                handler,
-                0,
-                null,
-                null
-            );
-
-            if (!latch.await(250, TimeUnit.MILLISECONDS)) {
-                return new HashMap<>();
-            }
-
-            String content = contentHolder[0];
-            if (content == null || content.trim().isEmpty()) {
-                return new HashMap<>();
-            }
-            InputStream stream = new java.io.ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-            return parseConfigStream(stream);
-        } catch (Throwable exception) {
-            return new HashMap<>();
-        } finally {
-            try {
-                handlerThread.quitSafely();
-            } catch (Throwable ignored) {
-            }
-        }
-    }
-
-    private static Map<String, String> parseConfigStream(InputStream inputStream) {
-        Map<String, String> config = new HashMap<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
-
-                int equalIndex = line.indexOf('=');
-                if (equalIndex > 0) {
-                    String key = line.substring(0, equalIndex).trim();
-                    String value = line.substring(equalIndex + 1).trim();
-                    if (value.startsWith("\"") && value.endsWith("\"")) {
-                        value = value.substring(1, value.length() - 1);
-                    }
-                    config.put(key, value);
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return config;
-    }
-
-    private static Context resolveAnyContext() {
-        try {
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object currentThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
-            if (currentThread == null) {
-                return null;
-            }
-
-            Object currentApplication = activityThreadClass.getMethod("currentApplication").invoke(null);
-            if (currentApplication instanceof Context) {
-                return (Context) currentApplication;
-            }
-
-            Object systemContext = activityThreadClass.getMethod("getSystemContext").invoke(currentThread);
-            if (systemContext instanceof Context) {
-                return (Context) systemContext;
-            }
-        } catch (Exception ignored) {
         }
         return null;
     }
@@ -655,8 +414,7 @@ public class ConfigManager {
     }
 
     private static String getConfigValue(String key) {
-        ensureFreshConfig();
-        return allProperties.get(key);
+        return HookSafetyPolicy.isRuntimeStateProperty(key) ? null : STORE.current().properties.get(key);
     }
 
     private static boolean hasConfigValue(String key) {
@@ -684,8 +442,8 @@ public class ConfigManager {
     }
 
     public static String getSystemProperty(String key, String defaultValue) {
-        ensureFreshConfig();
-        if (usingEmbeddedDefaults) {
+        RuntimeConfigStore.Snapshot config = STORE.current();
+        if (!config.hasAssignedProfile() || HookSafetyPolicy.isRuntimeStateProperty(key)) {
             return defaultValue;
         }
         String fieldId = getToggleFieldForSystemProperty(key);
@@ -757,7 +515,8 @@ public class ConfigManager {
     }
 
     public static boolean isHostLeakProperty(String key) {
-        if (key == null || key.isEmpty()) {
+        if (!hasAssignedProfile() || key == null || key.isEmpty()
+            || HookSafetyPolicy.isRuntimeStateProperty(key)) {
             return false;
         }
         String brand = getBuildBrand();
@@ -792,12 +551,12 @@ public class ConfigManager {
     }
 
     public static Map<String, String> getEffectiveSystemProperties() {
-        ensureFreshConfig();
+        RuntimeConfigStore.Snapshot config = STORE.current();
         Map<String, String> result = new LinkedHashMap<>();
-        if (usingEmbeddedDefaults || allProperties == null || allProperties.isEmpty()) {
+        if (!config.hasAssignedProfile()) {
             return result;
         }
-        for (Map.Entry<String, String> entry : allProperties.entrySet()) {
+        for (Map.Entry<String, String> entry : config.properties.entrySet()) {
             String key = entry.getKey();
             if (!isShellVisibleSystemProperty(key)) {
                 continue;
@@ -840,7 +599,7 @@ public class ConfigManager {
     }
 
     private static boolean isShellVisibleSystemProperty(String key) {
-        if (key == null || key.trim().isEmpty()) {
+        if (key == null || key.trim().isEmpty() || HookSafetyPolicy.isRuntimeStateProperty(key)) {
             return false;
         }
         if (key.startsWith("device.")) {
@@ -974,6 +733,9 @@ public class ConfigManager {
     }
 
     public static boolean isSpoofEnabled(String fieldId) {
+        if (!hasAssignedProfile()) {
+            return false;
+        }
         if (fieldId == null || fieldId.trim().isEmpty()) {
             return true;
         }
@@ -1259,8 +1021,7 @@ public class ConfigManager {
     }
 
     public static boolean isConfigAvailable() {
-        ensureFreshConfig();
-        return !allProperties.isEmpty();
+        return hasAssignedProfile();
     }
 
     public static String getBuildFingerprint() {
@@ -1868,10 +1629,6 @@ public class ConfigManager {
         }
     }
 
-    private static void resetGeneratedCaches() {
-        // Intentionally empty.
-    }
-
     private static byte[] decodeHex(String hex) {
         String normalized = hex.replace(" ", "").replace(":", "");
         if ((normalized.length() % 2) != 0) {
@@ -1890,14 +1647,5 @@ public class ConfigManager {
         }
     }
 
-    private static final class LoadedProperties {
-        private final Map<String, String> properties;
-        private final boolean fromEmbeddedDefaults;
-
-        private LoadedProperties(Map<String, String> properties, boolean fromEmbeddedDefaults) {
-            this.properties = properties;
-            this.fromEmbeddedDefaults = fromEmbeddedDefaults;
-        }
-    }
 }
 

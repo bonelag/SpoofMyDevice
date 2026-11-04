@@ -256,6 +256,17 @@ public final class AppProfileStore {
         editor.commit();
     }
 
+    public static String readStateContent(Context context) {
+        if (context == null) {
+            return null;
+        }
+        try {
+            return readFile(new File(context.getFilesDir(), FILE_NAME));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     public static String resolveConfig(Context context, String packageName) {
         if (context == null || packageName == null || packageName.trim().isEmpty()) {
             return null;

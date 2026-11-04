@@ -11,8 +11,8 @@ android {
         applicationId = "com.spoofmydevice"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "2.0.3"
+        versionCode = 13
+        versionName = "2.0.4"
     }
 
     buildTypes {
@@ -63,4 +63,5 @@ dependencies {
     compileOnly(files("libs/api-82.jar"))
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
