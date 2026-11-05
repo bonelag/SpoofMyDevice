@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.remember
 import com.devicespooflab.hooks.data.AppSettingsStore
+import com.devicespooflab.hooks.ui.MiuixSafeModeScreen
 import com.devicespooflab.hooks.ui.SafeModeScreen
 import com.devicespooflab.hooks.ui.SpoofAppState
 import com.devicespooflab.hooks.ui.SpoofMyDeviceTheme
@@ -25,16 +26,29 @@ class SafeModeAppsActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val appState = remember { SpoofAppState(this) }
-            SpoofMyDeviceTheme {
-                SafeModeScreen(
-                    appState = appState,
-                    initialSelectedPackages = selectedPackages,
-                    onSelectionChanged = {
-                        selectedPackages.clear()
-                        selectedPackages.addAll(it)
-                    },
-                    onBack = ::finish,
-                )
+            val useMiuix = AppSettingsStore.getUiStyle(this) == AppSettingsStore.UI_STYLE_MIUIX
+            SpoofMyDeviceTheme(uiStyle = appState.uiStyle) {
+                if (useMiuix) {
+                    MiuixSafeModeScreen(
+                        appState = appState,
+                        initialSelectedPackages = selectedPackages,
+                        onSelectionChanged = {
+                            selectedPackages.clear()
+                            selectedPackages.addAll(it)
+                        },
+                        onBack = ::finish,
+                    )
+                } else {
+                    SafeModeScreen(
+                        appState = appState,
+                        initialSelectedPackages = selectedPackages,
+                        onSelectionChanged = {
+                            selectedPackages.clear()
+                            selectedPackages.addAll(it)
+                        },
+                        onBack = ::finish,
+                    )
+                }
             }
         }
     }

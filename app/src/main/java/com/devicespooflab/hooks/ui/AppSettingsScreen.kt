@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
@@ -99,8 +100,12 @@ fun AppSettingsScreen(appState: SpoofAppState, scaffoldPadding: PaddingValues) {
         SettingOption(AppSettingsStore.COLOR_STYLE_ROSE, R.string.color_style_rose),
         SettingOption(AppSettingsStore.COLOR_STYLE_AMBER, R.string.color_style_amber),
     )
+    val uiStyleOptions = listOf(
+        SettingOption(AppSettingsStore.UI_STYLE_MATERIAL, R.string.ui_style_material),
+        SettingOption(AppSettingsStore.UI_STYLE_MIUIX, R.string.ui_style_miuix),
+    )
     val systemColors = appState.systemColorsEnabled
-    val appearanceCount = if (systemColors) 2 else 3
+    val appearanceCount = if (systemColors) 3 else 4
     LaunchedEffect(Unit) { listState.scrollToItem(0) }
 
     LazyColumn(
@@ -172,13 +177,24 @@ fun AppSettingsScreen(appState: SpoofAppState, scaffoldPadding: PaddingValues) {
         }
         item {
             ConnectedSettingsRow(
-                index = appearanceCount - 1,
+                index = if (systemColors) 1 else 2,
                 count = appearanceCount,
                 title = stringResource(R.string.settings_language_title),
                 summary = stringResource(R.string.settings_language_helper),
                 icon = Icons.Outlined.Translate,
                 trailingText = optionLabel(languageOptions, appState.languageMode),
                 onClick = { optionDialog.value = "language" },
+            )
+        }
+        item {
+            ConnectedSettingsRow(
+                index = appearanceCount - 1,
+                count = appearanceCount,
+                title = stringResource(R.string.settings_ui_style_title),
+                summary = stringResource(R.string.settings_ui_style_summary),
+                icon = Icons.Outlined.PhoneAndroid,
+                trailingText = optionLabel(uiStyleOptions, appState.uiStyle),
+                onClick = { optionDialog.value = "ui" },
             )
         }
 
@@ -266,6 +282,16 @@ fun AppSettingsScreen(appState: SpoofAppState, scaffoldPadding: PaddingValues) {
             onDismiss = { optionDialog.value = null },
             onSelect = {
                 appState.updateColorStyle(it)
+                optionDialog.value = null
+            },
+        )
+        "ui" -> OptionDialog(
+            title = stringResource(R.string.settings_choose_ui_style),
+            options = uiStyleOptions,
+            selectedId = appState.uiStyle,
+            onDismiss = { optionDialog.value = null },
+            onSelect = {
+                appState.updateUiStyle(it)
                 optionDialog.value = null
             },
         )

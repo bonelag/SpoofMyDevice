@@ -1,2 +1,3 @@
-Read @MEMORY.md for context.
-Everything you do, even the smallest task, must be recorded in @MEMORY.md
+- Read `@MEMORY.md` for context.
+- Everything you do must be recorded in `@MEMORY.md` in English (do not include routine chat history; record only technical reports, code modifications, logic, workflows, etc.).
+- When responding to users, please reply in Vietnamese.

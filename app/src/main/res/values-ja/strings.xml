@@ -11,6 +11,9 @@
     <string name="navigation_expand">ナビゲーションを展開</string>
     <string name="navigation_collapse">ナビゲーションを折りたたむ</string>
     <string name="app_profile_search">アプリを検索</string>
+    <string name="app_filter_all">すべて</string>
+    <string name="app_filter_configured">設定済み</string>
+    <string name="app_filter_unassigned">未設定</string>
     <string name="app_profile_loading_apps">アプリを読み込んでいます…</string>
     <string name="app_profile_loading_profiles">プロファイルを読み込んでいます…</string>
     <string name="app_profile_unassigned">未設定</string>
@@ -124,6 +127,11 @@
     <string name="settings_real_info_summary">アプリ情報、クレジット、プロジェクトリンクを開きます。</string>
     <string name="settings_choose_theme">テーマを選択</string>
     <string name="settings_choose_language">言語を選択</string>
+    <string name="settings_ui_style_title">インターフェーススタイル</string>
+    <string name="settings_ui_style_summary">Material または MIUI (Miuix) スタイル</string>
+    <string name="settings_choose_ui_style">インターフェーススタイルを選択</string>
+    <string name="ui_style_material">Material</string>
+    <string name="ui_style_miuix">MIUI (Miuix)</string>
     <string name="settings_choose_color_style">カラースタイルを選択</string>
     <string name="settings_resolution_title">偽装解像度を適用</string>
     <string name="settings_resolution_summary">デフォルトではオフです。強制すると一部のアプリが壊れる場合があります。</string>

@@ -75,6 +75,8 @@ class SpoofAppState(val activity: AppCompatActivity) {
         private set
     var colorStyle by mutableStateOf(AppSettingsStore.getColorStyle(activity))
         private set
+    var uiStyle by mutableStateOf(AppSettingsStore.getUiStyle(activity))
+        private set
 
     val editor = ProfileEditorState()
 
@@ -97,6 +99,11 @@ class SpoofAppState(val activity: AppCompatActivity) {
     fun updateColorStyle(value: String) {
         AppSettingsStore.setColorStyle(activity, value)
         colorStyle = AppSettingsStore.getColorStyle(activity)
+    }
+
+    fun updateUiStyle(value: String) {
+        AppSettingsStore.setUiStyle(activity, value)
+        uiStyle = AppSettingsStore.getUiStyle(activity)
     }
 
     suspend fun initialize() {

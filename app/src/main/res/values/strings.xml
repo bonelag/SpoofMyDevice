@@ -12,6 +12,9 @@
     <string name="navigation_expand">Expand navigation</string>
     <string name="navigation_collapse">Collapse navigation</string>
     <string name="app_profile_search">Search apps</string>
+    <string name="app_filter_all">All</string>
+    <string name="app_filter_configured">Configured</string>
+    <string name="app_filter_unassigned">Unassigned</string>
     <string name="app_profile_loading_apps">Loading apps…</string>
     <string name="app_profile_loading_profiles">Loading profiles…</string>
     <string name="app_profile_unassigned">Not configured</string>
@@ -125,6 +128,11 @@
     <string name="settings_real_info_summary">Open app details, credits, and project links.</string>
     <string name="settings_choose_theme">Choose theme</string>
     <string name="settings_choose_language">Choose language</string>
+    <string name="settings_ui_style_title">Interface style</string>
+    <string name="settings_ui_style_summary">Material or MIUI (Miuix) style</string>
+    <string name="settings_choose_ui_style">Choose interface style</string>
+    <string name="ui_style_material">Material</string>
+    <string name="ui_style_miuix">MIUI (Miuix)</string>
     <string name="settings_choose_color_style">Choose color style</string>
     <string name="settings_resolution_title">Apply spoofed screen resolution</string>
     <string name="settings_resolution_summary">Off by default. Some apps may break when forced.</string>

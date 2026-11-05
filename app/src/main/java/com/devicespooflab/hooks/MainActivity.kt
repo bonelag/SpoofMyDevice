@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
                 languageMode = appState.languageMode,
                 useSystemColor = appState.systemColorsEnabled,
                 colorStyle = appState.colorStyle,
+                uiStyle = appState.uiStyle,
             ) {
                 SpoofMyDeviceApp(appState)
             }

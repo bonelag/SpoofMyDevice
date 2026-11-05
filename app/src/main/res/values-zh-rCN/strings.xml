@@ -11,6 +11,9 @@
     <string name="navigation_expand">展开导航</string>
     <string name="navigation_collapse">收起导航</string>
     <string name="app_profile_search">搜索应用</string>
+    <string name="app_filter_all">全部</string>
+    <string name="app_filter_configured">已配置</string>
+    <string name="app_filter_unassigned">未配置</string>
     <string name="app_profile_loading_apps">正在加载应用…</string>
     <string name="app_profile_loading_profiles">正在加载配置文件…</string>
     <string name="app_profile_unassigned">未配置</string>
@@ -124,6 +127,11 @@
     <string name="settings_real_info_summary">打开应用详情、致谢与项目链接。</string>
     <string name="settings_choose_theme">选择主题</string>
     <string name="settings_choose_language">选择语言</string>
+    <string name="settings_ui_style_title">界面样式</string>
+    <string name="settings_ui_style_summary">Material 或 MIUI (Miuix) 风格</string>
+    <string name="settings_choose_ui_style">选择界面样式</string>
+    <string name="ui_style_material">Material</string>
+    <string name="ui_style_miuix">MIUI (Miuix)</string>
     <string name="settings_choose_color_style">选择颜色风格</string>
     <string name="settings_resolution_title">应用伪装分辨率</string>
     <string name="settings_resolution_summary">默认关闭。强制启用可能导致部分应用显示异常。</string>

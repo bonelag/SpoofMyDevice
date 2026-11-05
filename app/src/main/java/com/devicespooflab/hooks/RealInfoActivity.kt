@@ -41,6 +41,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.content.pm.PackageInfoCompat
 import com.devicespooflab.hooks.data.AppSettingsStore
 import com.devicespooflab.hooks.ui.ConnectedInfoRow
+import com.devicespooflab.hooks.ui.MiuixAppInfoScreen
 import com.devicespooflab.hooks.ui.ConnectedSettingsRow
 import com.devicespooflab.hooks.ui.SectionTitle
 import com.devicespooflab.hooks.ui.SpoofMyDeviceTheme
@@ -53,7 +54,13 @@ class RealInfoActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             SpoofMyDeviceTheme {
-                AppInfoScreen(this)
+                val useMiuix = AppSettingsStore.getUiStyle(this) == AppSettingsStore.UI_STYLE_MIUIX
+                if (useMiuix) {
+                    MiuixAppInfoScreen(this)
+                } else {
+                    AppInfoScreen(this)
+                }
+
             }
         }
     }

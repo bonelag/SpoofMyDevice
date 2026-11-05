@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import com.devicespooflab.hooks.data.AppSettingsStore
 import com.devicespooflab.hooks.ui.DiagnosticsScreen
+import com.devicespooflab.hooks.ui.MiuixDiagnosticsScreen
 import com.devicespooflab.hooks.ui.SpoofAppState
 import com.devicespooflab.hooks.ui.SpoofMyDeviceTheme
 
@@ -19,9 +20,14 @@ class DiagnosticsActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             val appState = remember { SpoofAppState(this) }
+            val useMiuix = AppSettingsStore.getUiStyle(this) == AppSettingsStore.UI_STYLE_MIUIX
             LaunchedEffect(appState) { appState.initialize() }
-            SpoofMyDeviceTheme {
-                DiagnosticsScreen(appState, onBack = ::finish)
+            SpoofMyDeviceTheme(uiStyle = appState.uiStyle) {
+                if (useMiuix) {
+                    MiuixDiagnosticsScreen(appState, onBack = ::finish)
+                } else {
+                    DiagnosticsScreen(appState, onBack = ::finish)
+                }
             }
         }
     }

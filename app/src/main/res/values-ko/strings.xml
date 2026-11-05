@@ -11,6 +11,9 @@
     <string name="navigation_expand">내비게이션 펼치기</string>
     <string name="navigation_collapse">내비게이션 접기</string>
     <string name="app_profile_search">앱 검색</string>
+    <string name="app_filter_all">전체</string>
+    <string name="app_filter_configured">설정됨</string>
+    <string name="app_filter_unassigned">미설정</string>
     <string name="app_profile_loading_apps">앱을 불러오는 중…</string>
     <string name="app_profile_loading_profiles">프로필을 불러오는 중…</string>
     <string name="app_profile_unassigned">미설정</string>
@@ -124,6 +127,11 @@
     <string name="settings_real_info_summary">앱 정보, 크레딧, 프로젝트 링크를 엽니다.</string>
     <string name="settings_choose_theme">테마 선택</string>
     <string name="settings_choose_language">언어 선택</string>
+    <string name="settings_ui_style_title">인터페이스 스타일</string>
+    <string name="settings_ui_style_summary">Material 또는 MIUI (Miuix) 스타일</string>
+    <string name="settings_choose_ui_style">인터페이스 스타일 선택</string>
+    <string name="ui_style_material">Material</string>
+    <string name="ui_style_miuix">MIUI (Miuix)</string>
     <string name="settings_choose_color_style">컬러 스타일 선택</string>
     <string name="settings_resolution_title">스푸핑 해상도 적용</string>
     <string name="settings_resolution_summary">기본값은 꺼짐입니다. 강제 적용 시 일부 앱이 깨질 수 있습니다.</string>

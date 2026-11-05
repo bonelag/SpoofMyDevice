@@ -15,6 +15,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.devicespooflab.hooks.data.AppSettingsStore
+import com.devicespooflab.hooks.ui.MiuixProfileEditorLoadingScreen
+import com.devicespooflab.hooks.ui.MiuixProfileEditorScreen
 import com.devicespooflab.hooks.ui.ProfileEditorLoadingScreen
 import com.devicespooflab.hooks.ui.ProfileEditorScreen
 import com.devicespooflab.hooks.ui.SpoofAppState
@@ -29,6 +31,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         val editingProfileId = intent.getStringExtra(EXTRA_PROFILE_ID)
+        val useMiuix = AppSettingsStore.getUiStyle(this) == AppSettingsStore.UI_STYLE_MIUIX
         setContent {
             val appState = remember { SpoofAppState(this) }
             val scope = rememberCoroutineScope()
@@ -51,41 +54,62 @@ class ProfileEditorActivity : AppCompatActivity() {
                 ready = true
             }
 
+            val onSave: () -> Unit = {
+                scope.launch {
+                    val savedProfileId = if (editingProfileId == null) {
+                        appState.createProfile(profileName)
+                    } else {
+                        appState.saveEditor(profileName)
+                    }
+                    if (savedProfileId != null) {
+                        setResult(
+                            Activity.RESULT_OK,
+                            Intent().putExtra(EXTRA_RESULT_PROFILE_ID, savedProfileId),
+                        )
+                        finish()
+                    }
+                }
+            }
+
             SpoofMyDeviceTheme(
                 themeMode = appState.themeMode,
                 languageMode = appState.languageMode,
                 useSystemColor = appState.systemColorsEnabled,
                 colorStyle = appState.colorStyle,
+                uiStyle = appState.uiStyle,
             ) {
                 if (!ready) {
-                    ProfileEditorLoadingScreen(
-                        creating = editingProfileId == null,
-                        onBack = ::finish,
-                    )
+                    if (useMiuix) {
+                        MiuixProfileEditorLoadingScreen(
+                            creating = editingProfileId == null,
+                            onBack = ::finish,
+                        )
+                    } else {
+                        ProfileEditorLoadingScreen(
+                            creating = editingProfileId == null,
+                            onBack = ::finish,
+                        )
+                    }
                 } else {
-                    ProfileEditorScreen(
-                        appState = appState,
-                        creating = editingProfileId == null,
-                        profileName = profileName,
-                        onProfileNameChange = { profileName = it },
-                        onSave = {
-                            scope.launch {
-                                val savedProfileId = if (editingProfileId == null) {
-                                    appState.createProfile(profileName)
-                                } else {
-                                    appState.saveEditor(profileName)
-                                }
-                                if (savedProfileId != null) {
-                                    setResult(
-                                        Activity.RESULT_OK,
-                                        Intent().putExtra(EXTRA_RESULT_PROFILE_ID, savedProfileId),
-                                    )
-                                    finish()
-                                }
-                            }
-                        },
-                        onBack = ::finish,
-                    )
+                    if (useMiuix) {
+                        MiuixProfileEditorScreen(
+                            appState = appState,
+                            creating = editingProfileId == null,
+                            profileName = profileName,
+                            onProfileNameChange = { profileName = it },
+                            onSave = onSave,
+                            onBack = ::finish,
+                        )
+                    } else {
+                        ProfileEditorScreen(
+                            appState = appState,
+                            creating = editingProfileId == null,
+                            profileName = profileName,
+                            onProfileNameChange = { profileName = it },
+                            onSave = onSave,
+                            onBack = ::finish,
+                        )
+                    }
                 }
             }
         }

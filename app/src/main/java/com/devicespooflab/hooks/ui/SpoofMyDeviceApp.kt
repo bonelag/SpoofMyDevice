@@ -58,9 +58,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.devicespooflab.hooks.R
+import com.devicespooflab.hooks.data.AppSettingsStore
 import androidx.core.content.pm.PackageInfoCompat
 
-private enum class AppDestination(
+internal enum class AppDestination(
     val labelRes: Int,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
@@ -83,6 +84,10 @@ private enum class NavigationType {
 )
 @Composable
 fun SpoofMyDeviceApp(appState: SpoofAppState) {
+    if (appState.uiStyle == AppSettingsStore.UI_STYLE_MIUIX) {
+        MiuixApp(appState)
+        return
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     var destinationName by rememberSaveable { mutableStateOf(AppDestination.Home.name) }
     val destination = AppDestination.valueOf(destinationName)

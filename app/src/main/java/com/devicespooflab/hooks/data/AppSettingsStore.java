@@ -23,6 +23,8 @@ public final class AppSettingsStore {
     public static final String COLOR_STYLE_BLUE = "blue";
     public static final String COLOR_STYLE_ROSE = "rose";
     public static final String COLOR_STYLE_AMBER = "amber";
+    public static final String UI_STYLE_MATERIAL = "material";
+    public static final String UI_STYLE_MIUIX = "miuix";
     public static final String DEFAULT_PRESET_SOURCE_URL = "https://github.com/bonelag/SpoofMyDevice";
 
     private static final String PREFS_NAME = "app_settings";
@@ -30,6 +32,7 @@ public final class AppSettingsStore {
     private static final String KEY_LANGUAGE_MODE = "language_mode";
     private static final String KEY_USE_SYSTEM_COLORS = "use_system_colors";
     private static final String KEY_COLOR_STYLE = "color_style";
+    private static final String KEY_UI_STYLE = "ui_style";
     private static final String KEY_PRESET_SOURCE_URL = "preset_source_url";
     private static final String KEY_SAFE_MODE_EXPLANATION_DISMISSED = "safe_mode_explanation_dismissed";
 
@@ -70,6 +73,14 @@ public final class AppSettingsStore {
 
     public static String getColorStyle(Context context) {
         return normalizeColorStyle(preferences(context).getString(KEY_COLOR_STYLE, COLOR_STYLE_MINT));
+    }
+
+    public static String getUiStyle(Context context) {
+        return normalizeUiStyle(preferences(context).getString(KEY_UI_STYLE, UI_STYLE_MIUIX));
+    }
+
+    public static void setUiStyle(Context context, String value) {
+        preferences(context).edit().putString(KEY_UI_STYLE, normalizeUiStyle(value)).apply();
     }
 
     public static void setColorStyle(Context context, String value) {
@@ -124,6 +135,13 @@ public final class AppSettingsStore {
             return LANGUAGE_CHINESE_SIMPLIFIED;
         }
         return LANGUAGE_DEFAULT;
+    }
+
+    private static String normalizeUiStyle(String value) {
+        if (UI_STYLE_MATERIAL.equals(value)) {
+            return UI_STYLE_MATERIAL;
+        }
+        return UI_STYLE_MIUIX;
     }
 
     private static String normalizeColorStyle(String value) {

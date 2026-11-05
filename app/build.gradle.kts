@@ -56,6 +56,7 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.5.0-alpha24")
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("com.materialkolor:material-kolor:4.1.1")
+    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.4")
     implementation("com.google.android.material:material:1.14.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

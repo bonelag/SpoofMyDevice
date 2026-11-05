@@ -19,6 +19,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.core.view.WindowCompat
 import com.devicespooflab.hooks.data.AppSettingsStore
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeColorSpec
+import top.yukonga.miuix.kmp.theme.ThemeController
+import top.yukonga.miuix.kmp.theme.ThemePaletteStyle
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.ktx.animateColorScheme
@@ -35,6 +40,7 @@ fun SpoofMyDeviceTheme(
     languageMode: String? = null,
     useSystemColor: Boolean? = null,
     colorStyle: String? = null,
+    uiStyle: String? = null,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -44,6 +50,7 @@ fun SpoofMyDeviceTheme(
     val selectedLanguageMode = languageMode ?: AppSettingsStore.getLanguageMode(context)
     val selectedSystemColor = useSystemColor ?: AppSettingsStore.isSystemColorEnabled(context)
     val selectedColorStyle = colorStyle ?: AppSettingsStore.getColorStyle(context)
+    val selectedUiStyle = uiStyle ?: AppSettingsStore.getUiStyle(context)
     val systemIsDark = isSystemInDarkTheme()
     val isDark = when (selectedThemeMode) {
         AppSettingsStore.THEME_LIGHT -> false
@@ -99,14 +106,27 @@ fun SpoofMyDeviceTheme(
         LocalConfiguration provides localizedConfiguration,
         LocalResources provides localizedContext.resources,
     ) {
-        MaterialExpressiveTheme(
-            colorScheme = colorScheme,
-            motionScheme = MotionScheme.expressive(),
-            content = content,
-        )
+        if (selectedUiStyle == AppSettingsStore.UI_STYLE_MIUIX) {
+            MiuixTheme(
+                controller = remember(seedColor, isDark) {
+                    ThemeController(
+                        colorSchemeMode = if (isDark) ColorSchemeMode.MonetDark else ColorSchemeMode.MonetLight,
+                        keyColor = seedColor,
+                        colorSpec = ThemeColorSpec.Spec2025,
+                        paletteStyle = ThemePaletteStyle.TonalSpot,
+                    )
+                },
+                content = content,
+            )
+        } else {
+            MaterialExpressiveTheme(
+                colorScheme = colorScheme,
+                motionScheme = MotionScheme.expressive(),
+                content = content,
+            )
+        }
     }
 }
-
 private tailrec fun Context.findActivity(): Activity? {
     return when (this) {
         is Activity -> this

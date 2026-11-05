@@ -25,6 +25,8 @@ import com.devicespooflab.hooks.data.AppSettingsStore
 import com.devicespooflab.hooks.data.ConfigFileManager
 import com.devicespooflab.hooks.utils.ConfigManager
 import com.devicespooflab.hooks.ui.AppProfileAssignmentScreen
+import com.devicespooflab.hooks.ui.MiuixAppProfileAssignmentLoadingScreen
+import com.devicespooflab.hooks.ui.MiuixAppProfileAssignmentScreen
 import com.devicespooflab.hooks.ui.AppProfileAssignmentLoadingScreen
 import com.devicespooflab.hooks.ui.SpoofMyDeviceTheme
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +50,7 @@ class AppProfileAssignmentActivity : AppCompatActivity() {
         setContent {
             var screenState by remember { mutableStateOf<AssignmentScreenState?>(null) }
             val scope = rememberCoroutineScope()
+            val useMiuix = AppSettingsStore.getUiStyle(this@AppProfileAssignmentActivity) == AppSettingsStore.UI_STYLE_MIUIX
             val profileEditorLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { result ->
@@ -65,8 +68,33 @@ class AppProfileAssignmentActivity : AppCompatActivity() {
             SpoofMyDeviceTheme {
                 val state = screenState
                 if (state == null) {
-                    AppProfileAssignmentLoadingScreen(onBack = ::finish)
+                    if (useMiuix) { MiuixAppProfileAssignmentLoadingScreen(onBack = ::finish) } else { AppProfileAssignmentLoadingScreen(onBack = ::finish) }
                 } else {
+                    if (useMiuix) {
+                        MiuixAppProfileAssignmentScreen(
+                            label = state.label,
+                            packageName = state.packageName,
+                            icon = state.icon,
+                            profiles = state.profiles.profiles,
+                            assignedProfileId = state.profiles.assignments[state.packageName],
+                            defaultProfileName = state.profiles.globalProperties[ConfigManager.KEY_DEFAULT_PROFILE_ID]?.let { id ->
+                                state.profiles.profiles.find { it.id == id }?.name
+                            },
+                            onProfileSelected = { profileId ->
+                                scope.launch {
+                                    val profiles = saveAssignment(state.packageName, profileId)
+                                    screenState = state.copy(profiles = profiles)
+                                    setResult(Activity.RESULT_OK)
+                                }
+                            },
+                            onCreateProfile = {
+                                profileEditorLauncher.launch(
+                                    ProfileEditorActivity.createCreateIntent(this@AppProfileAssignmentActivity),
+                                )
+                            },
+                            onBack = ::finish,
+                        )
+                    } else {
                     AppProfileAssignmentScreen(
                         label = state.label,
                         packageName = state.packageName,
@@ -90,6 +118,7 @@ class AppProfileAssignmentActivity : AppCompatActivity() {
                         },
                         onBack = ::finish,
                     )
+                    }
                 }
             }
         }

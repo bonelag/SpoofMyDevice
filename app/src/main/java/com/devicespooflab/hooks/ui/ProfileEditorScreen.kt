@@ -65,14 +65,14 @@ import com.devicespooflab.hooks.R
 import com.devicespooflab.hooks.data.DevicePreset
 import com.devicespooflab.hooks.utils.ConfigManager
 
-private data class EditorField(
+internal data class EditorField(
     val fieldId: String,
     val labelRes: Int,
     val numeric: Boolean = false,
     val multiline: Boolean = false,
 )
 
-private val socFields = listOf(
+internal val socFields = listOf(
     EditorField(ConfigManager.FIELD_SOC_MODEL, R.string.settings_field_soc_model),
     EditorField(ConfigManager.FIELD_SOC_MANUFACTURER, R.string.settings_field_soc_manufacturer),
     EditorField(ConfigManager.FIELD_BOARD_PLATFORM, R.string.settings_field_board_platform),
@@ -92,7 +92,7 @@ private val socFields = listOf(
     EditorField(ConfigManager.FIELD_CPU_ABI_LIST_32, R.string.settings_field_cpu_abi_list_32),
 )
 
-private val systemFields = listOf(
+internal val systemFields = listOf(
     EditorField(ConfigManager.FIELD_MODEL, R.string.settings_field_model),
     EditorField(ConfigManager.FIELD_MANUFACTURER, R.string.settings_field_manufacturer),
     EditorField(ConfigManager.FIELD_BRAND, R.string.settings_field_brand),
@@ -118,13 +118,13 @@ private val systemFields = listOf(
     EditorField(ConfigManager.FIELD_SERIAL_NUMBER, R.string.settings_field_serial_number),
 )
 
-private val screenFields = listOf(
+internal val screenFields = listOf(
     EditorField(ConfigManager.FIELD_SCREEN_WIDTH, R.string.settings_field_screen_width, numeric = true),
     EditorField(ConfigManager.FIELD_SCREEN_HEIGHT, R.string.settings_field_screen_height, numeric = true),
     EditorField(ConfigManager.FIELD_SCREEN_DENSITY, R.string.settings_field_screen_density, numeric = true),
 )
 
-private val networkFields = listOf(
+internal val networkFields = listOf(
     EditorField(ConfigManager.FIELD_BASEBAND, R.string.settings_field_baseband),
     EditorField(ConfigManager.FIELD_OPERATOR_ALPHA, R.string.settings_field_operator_name),
     EditorField(ConfigManager.FIELD_OPERATOR_NUMERIC, R.string.settings_field_operator_numeric, numeric = true),
@@ -138,7 +138,7 @@ private val networkFields = listOf(
     EditorField(ConfigManager.FIELD_USER_AGENT, R.string.settings_field_user_agent, multiline = true),
 )
 
-private val advancedFields = listOf(
+internal val advancedFields = listOf(
     EditorField(ConfigManager.FIELD_ANDROID_ID, R.string.settings_field_device_id),
     EditorField(ConfigManager.FIELD_IMEI, R.string.settings_field_imei, numeric = true),
     EditorField(ConfigManager.FIELD_MEID, R.string.settings_field_meid),
