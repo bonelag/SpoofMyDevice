@@ -54,7 +54,7 @@ The project targets controlled compatibility testing, QA, privacy research, and 
 - Jetpack Compose interface with Material 3 Expressive and Miuix styles
 - Miuix selected by default; interface style can be changed in Settings
 - Dynamic system colors plus static color palettes
-- English, Korean, Japanese, and Simplified Chinese localization
+- English, Vietnamese, Korean, Japanese, and Simplified Chinese localization
 - Profile editor, app assignment, Safe Mode, diagnostics, and real-device information screens
 
 ## Architecture

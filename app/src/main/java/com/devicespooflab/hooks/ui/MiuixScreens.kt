@@ -990,6 +990,7 @@ fun MiuixAppSettingsScreen(appState: SpoofAppState, scaffoldPadding: PaddingValu
     val languageOptions = listOf(
         MiuixSettingOption(AppSettingsStore.LANGUAGE_DEFAULT, R.string.language_default),
         MiuixSettingOption(AppSettingsStore.LANGUAGE_ENGLISH, R.string.language_english),
+        MiuixSettingOption(AppSettingsStore.LANGUAGE_VIETNAMESE, R.string.language_vietnamese),
         MiuixSettingOption(AppSettingsStore.LANGUAGE_KOREAN, R.string.language_korean),
         MiuixSettingOption(AppSettingsStore.LANGUAGE_JAPANESE, R.string.language_japanese),
         MiuixSettingOption(AppSettingsStore.LANGUAGE_CHINESE_SIMPLIFIED, R.string.language_chinese),

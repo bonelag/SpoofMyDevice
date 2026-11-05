@@ -117,6 +117,7 @@
     <string name="settings_language_title">언어</string>
     <string name="language_default">기본값</string>
     <string name="language_english">English</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_korean">한국어</string>
     <string name="language_japanese">日本語</string>
     <string name="language_chinese">简体中文</string>
@@ -262,4 +263,12 @@
     <string name="settings_field_vulkan_level">Vulkan 레벨</string>
     <string name="settings_field_cpu_hardware">CPU 하드웨어</string>
     <string name="settings_field_cpu_cores">CPU 코어 수</string>
+    <string name="home_no_default_profile_title">기본 프로필 없음</string>
+    <string name="home_no_default_profile_body">Xposed 적용 범위에 있는 앱에 개별 프로필이 지정되지 않으면 기기 정보가 변경되지 않습니다. 프로필 탭에서 기본 프로필을 설정하세요.</string>
+    <string name="profile_set_default">기본값으로 설정</string>
+    <string name="profile_remove_default">기본 프로필 해제</string>
+    <string name="profile_default_badge">기본값</string>
+    <string name="profile_default_set_message">%1$s을(를) 기본 프로필로 설정했습니다.</string>
+    <string name="profile_default_removed_message">기본 프로필을 해제했습니다.</string>
+    <string name="app_profile_none_summary_with_default">기본 프로필(%1$s)을 사용합니다.</string>
 </resources>

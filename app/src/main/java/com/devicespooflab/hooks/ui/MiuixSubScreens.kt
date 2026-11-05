@@ -10,13 +10,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,9 +52,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.pm.PackageInfoCompat
@@ -221,116 +229,104 @@ fun MiuixEditorForm(
         stringResource(R.string.tab_network),
         stringResource(R.string.tab_identifiers),
     )
+    val textMeasurer = rememberTextMeasurer()
+    val tabStyle = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
+    val tabLayouts = tabs.map { textMeasurer.measure(it, style = tabStyle, maxLines = 1) }
+    val density = LocalDensity.current
+    val tabWidth = (with(density) { tabLayouts.maxOf { it.size.width }.toDp() } + 32.dp)
+        .coerceAtLeast(100.dp)
+    val tabHeight = (with(density) { tabLayouts.maxOf { it.size.height }.toDp() } + 20.dp)
+        .coerceAtLeast(48.dp)
+    val fields = when (selectedTabIndex) {
+        0 -> socFields
+        1 -> systemFields
+        2 -> screenFields
+        3 -> networkFields
+        else -> advancedFields
+    }
+    val profileNameLabel = stringResource(R.string.app_profile_name)
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(scaffoldPadding),
+            .padding(scaffoldPadding)
+            .consumeWindowInsets(scaffoldPadding)
+            .imePadding(),
+        contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        MiuixCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TextField(
-                    value = profileName,
-                    onValueChange = onProfileNameChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = stringResource(R.string.app_profile_name),
-                    singleLine = true,
-                )
-                MiuixPresetSelector(
-                    appState = appState,
-                    onPresetSelected = { preset ->
-                        if (profileName.isBlank()) {
-                            onProfileNameChange(preset.displayName)
-                        }
-                    },
-                )
+        item(key = "profile_name") {
+            MiuixCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(text = profileNameLabel, style = MiuixTheme.textStyles.body1)
+                    TextField(
+                        value = profileName,
+                        onValueChange = onProfileNameChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics { contentDescription = profileNameLabel },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    )
+                    MiuixPresetSelector(
+                        appState = appState,
+                        onPresetSelected = { preset ->
+                            if (profileName.isBlank()) {
+                                onProfileNameChange(preset.displayName)
+                            }
+                        },
+                    )
+                }
             }
         }
-
-        TabRow(
-            tabs = tabs,
-            selectedTabIndex = selectedTabIndex,
-            onTabSelected = { selectedTabIndex = it },
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f),
-        ) {
-            when (selectedTabIndex) {
-                0 -> MiuixEditorFieldList(socFields, editor)
-                1 -> MiuixEditorFieldList(systemFields, editor)
-                2 -> MiuixEditorFieldList(screenFields, editor)
-                3 -> MiuixEditorFieldList(networkFields, editor)
-                4 -> {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp),
-                        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+        item(key = "tabs") {
+            TabRow(
+                tabs = tabs,
+                selectedTabIndex = selectedTabIndex,
+                onTabSelected = { selectedTabIndex = it },
+                minWidth = tabWidth,
+                maxWidth = tabWidth,
+                height = tabHeight,
+            )
+        }
+        if (selectedTabIndex == 4) {
+            item(key = "identifier_actions") {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Button(
+                        onClick = {
+                            editor.randomizeAll()
+                            editor.customMode = true
+                        },
                     ) {
-                        item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Button(
-                                    onClick = {
-                                        editor.randomizeAll()
-                                        editor.customMode = true
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Icon(Icons.Filled.Casino, null, modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.settings_generate_all))
-                                }
-                                Button(
-                                    onClick = {
-                                        editor.clearAdvanced()
-                                        editor.customMode = true
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Icon(Icons.Outlined.DeleteSweep, null, modifier = Modifier.size(20.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.settings_clear_all))
-                                }
-                            }
-                        }
-                        items(advancedFields, key = { it.fieldId }) { field ->
-                            MiuixAdvancedEditorField(field = field, editor = editor)
-                        }
+                        Icon(Icons.Filled.Casino, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_generate_all))
+                    }
+                    Button(
+                        onClick = {
+                            editor.clearAdvanced()
+                            editor.customMode = true
+                        },
+                    ) {
+                        Icon(Icons.Outlined.DeleteSweep, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_clear_all))
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MiuixEditorFieldList(fields: List<EditorField>, editor: ProfileEditorState) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
         items(fields, key = { it.fieldId }) { field ->
-            MiuixEditorField(field = field, editor = editor)
+            if (selectedTabIndex == 4) {
+                MiuixAdvancedEditorField(field = field, editor = editor)
+            } else {
+                MiuixEditorField(field = field, editor = editor)
+            }
         }
     }
 }
@@ -384,33 +380,17 @@ private fun MiuixEditorField(
     modifier: Modifier = Modifier,
 ) {
     val spoofEnabled = editor.enabledFields[field.fieldId] != false
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(
-            state = if (spoofEnabled) ToggleableState.On else ToggleableState.Off,
-            onClick = { editor.enabledFields[field.fieldId] = !spoofEnabled },
-        )
-        Spacer(Modifier.width(8.dp))
-        TextField(
-            value = editor.values[field.fieldId].orEmpty(),
-            onValueChange = {
-                editor.values[field.fieldId] = it
-                editor.customMode = true
-            },
-            label = stringResource(field.labelRes),
-            enabled = spoofEnabled,
-            minLines = if (field.multiline) 2 else 1,
-            maxLines = if (field.multiline) 5 else 1,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (field.numeric) KeyboardType.Number else KeyboardType.Text,
-            ),
-            modifier = Modifier.weight(1f),
-        )
-    }
+    MiuixEditorFieldCard(
+        field = field,
+        value = editor.values[field.fieldId].orEmpty(),
+        spoofEnabled = spoofEnabled,
+        onSpoofToggle = { editor.enabledFields[field.fieldId] = !spoofEnabled },
+        onValueChange = {
+            editor.values[field.fieldId] = it
+            editor.customMode = true
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -420,41 +400,78 @@ private fun MiuixAdvancedEditorField(
     modifier: Modifier = Modifier,
 ) {
     val spoofEnabled = editor.enabledFields[field.fieldId] != false
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(
-            state = if (spoofEnabled) ToggleableState.On else ToggleableState.Off,
-            onClick = { editor.enabledFields[field.fieldId] = !spoofEnabled },
-        )
-        Spacer(Modifier.width(8.dp))
-        TextField(
-            value = editor.advancedValues[field.fieldId].orEmpty(),
-            onValueChange = {
-                editor.advancedValues[field.fieldId] = it
-                editor.customMode = true
-            },
-            label = stringResource(field.labelRes),
-            enabled = spoofEnabled,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (field.numeric) KeyboardType.Number else KeyboardType.Text,
-            ),
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(8.dp))
-        IconButton(
-            onClick = {
-                editor.randomize(field.fieldId)
-                editor.customMode = true
-            },
-            enabled = spoofEnabled,
+    MiuixEditorFieldCard(
+        field = field,
+        value = editor.advancedValues[field.fieldId].orEmpty(),
+        spoofEnabled = spoofEnabled,
+        onSpoofToggle = { editor.enabledFields[field.fieldId] = !spoofEnabled },
+        onValueChange = {
+            editor.advancedValues[field.fieldId] = it
+            editor.customMode = true
+        },
+        onRandomize = {
+            editor.randomize(field.fieldId)
+            editor.customMode = true
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun MiuixEditorFieldCard(
+    field: EditorField,
+    value: String,
+    spoofEnabled: Boolean,
+    onSpoofToggle: () -> Unit,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onRandomize: (() -> Unit)? = null,
+) {
+    val label = stringResource(field.labelRes)
+    MiuixCard(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Filled.Casino,
-                contentDescription = stringResource(R.string.settings_generate_random),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = label,
+                    style = MiuixTheme.textStyles.body1,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                Checkbox(
+                    state = if (spoofEnabled) ToggleableState.On else ToggleableState.Off,
+                    onClick = onSpoofToggle,
+                    modifier = Modifier.semantics { contentDescription = label },
+                )
+                if (onRandomize != null) {
+                    IconButton(onClick = onRandomize, enabled = spoofEnabled) {
+                        Icon(
+                            imageVector = Icons.Filled.Casino,
+                            contentDescription = stringResource(R.string.settings_generate_random),
+                        )
+                    }
+                }
+            }
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                enabled = spoofEnabled,
+                singleLine = false,
+                minLines = if (field.multiline) 2 else 1,
+                maxLines = Int.MAX_VALUE,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (field.numeric) KeyboardType.Number else KeyboardType.Text,
+                    imeAction = ImeAction.Done,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = label },
             )
         }
     }

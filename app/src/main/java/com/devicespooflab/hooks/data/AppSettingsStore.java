@@ -15,6 +15,7 @@ public final class AppSettingsStore {
 
     public static final String LANGUAGE_DEFAULT = "default";
     public static final String LANGUAGE_ENGLISH = "en";
+    public static final String LANGUAGE_VIETNAMESE = "vi";
     public static final String LANGUAGE_KOREAN = "ko";
     public static final String LANGUAGE_JAPANESE = "ja";
     public static final String LANGUAGE_CHINESE_SIMPLIFIED = "zh-CN";
@@ -124,6 +125,9 @@ public final class AppSettingsStore {
     private static String normalizeLanguage(String value) {
         if (LANGUAGE_ENGLISH.equals(value)) {
             return LANGUAGE_ENGLISH;
+        }
+        if (LANGUAGE_VIETNAMESE.equals(value)) {
+            return LANGUAGE_VIETNAMESE;
         }
         if (LANGUAGE_KOREAN.equals(value)) {
             return LANGUAGE_KOREAN;

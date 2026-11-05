@@ -117,6 +117,7 @@
     <string name="settings_language_title">语言</string>
     <string name="language_default">默认</string>
     <string name="language_english">English</string>
+    <string name="language_vietnamese">Tiếng Việt</string>
     <string name="language_korean">한국어</string>
     <string name="language_japanese">日本語</string>
     <string name="language_chinese">简体中文</string>
@@ -266,4 +267,12 @@
     <string name="settings_field_vulkan_level">Vulkan 级别</string>
     <string name="settings_field_cpu_hardware">CPU 硬件</string>
     <string name="settings_field_cpu_cores">CPU 核心数</string>
+    <string name="home_no_default_profile_title">未设置默认配置</string>
+    <string name="home_no_default_profile_body">Xposed 作用域内未单独分配配置的应用不会被伪装。请在配置标签页中设置默认配置。</string>
+    <string name="profile_set_default">设为默认</string>
+    <string name="profile_remove_default">取消默认</string>
+    <string name="profile_default_badge">默认</string>
+    <string name="profile_default_set_message">已将 %1$s 设为默认配置。</string>
+    <string name="profile_default_removed_message">已取消默认配置。</string>
+    <string name="app_profile_none_summary_with_default">将使用默认配置（%1$s）。</string>
 </resources>
