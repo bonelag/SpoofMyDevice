@@ -4,7 +4,7 @@
 
 **Per-application Android device-profile spoofing for Xposed-compatible runtimes.**
 
-[![Version](https://img.shields.io/badge/version-2.0.4-4f46e5)](https://github.com/BuSung-dev/SpoofMyDevice/releases)
+[![Version](https://img.shields.io/badge/version-2.0.5-4f46e5)](https://github.com/BuSung-dev/SpoofMyDevice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?logo=android&logoColor=white)](#requirements)
 [![Xposed API](https://img.shields.io/badge/Xposed_API-93%2B-f97316)](#requirements)
 [![Java](https://img.shields.io/badge/Java-17-007396?logo=openjdk&logoColor=white)](#build-from-source)
@@ -234,7 +234,7 @@ app/build/outputs/apk/debug/app-debug.apk
 
 The repository uses Gradle 9.5.0, Android Gradle Plugin 9.3.0, Kotlin Compose plugin 2.3.21, Java 17, and a local compile-only Xposed API JAR.
 
-The GitHub Actions workflow is manual and publishes a debug-signed APK. Configure a private release keystore before distributing production builds.
+The GitHub Actions workflow is manual and publishes a debug-signed APK. It reads `versionName` from the generated APK metadata to name the release and its `v<versionName>` tag; no version input is needed. Configure a private release keystore before distributing production builds.
 
 ## Verification Status
 

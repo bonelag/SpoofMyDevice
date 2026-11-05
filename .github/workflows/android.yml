@@ -2,11 +2,6 @@ name: Build and Release SpoofMyDevice
 
 on:
   workflow_dispatch:
-    inputs:
-      version_name:
-        description: 'Version name for the release (e.g., 1.0)'
-        required: true
-        default: '1.0.0'
 
 jobs:
   build:
@@ -29,24 +24,36 @@ jobs:
       - name: Grant Execute Permission for Gradle Wrapper
         run: chmod +x gradlew
 
-      - name: Build Minified Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug
 
-      # Locates the debug APK (which is auto-signed with the debug certificate)
-      - name: Locate Debug APK
-        id: locate_apk
+      - name: Read APK metadata
+        id: apk_metadata
+        shell: python
         run: |
-          APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "Found APK at: $APK_PATH"
+          import json
+          import os
+          from pathlib import Path
+
+          metadata_path = Path("app/build/outputs/apk/debug/output-metadata.json")
+          artifact = json.loads(metadata_path.read_text(encoding="utf-8"))["elements"][0]
+          version_name = artifact["versionName"]
+          apk_path = metadata_path.parent / artifact["outputFile"]
+          if not isinstance(version_name, str) or not version_name or not apk_path.is_file():
+              raise RuntimeError("Missing app version or generated APK.")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version_name={version_name}\n")
+              output.write(f"apk_path={apk_path.as_posix()}\n")
+          print(f"Prepared SpoofMyDevice v{version_name}: {apk_path}")
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.locate_apk.outputs.apk_path }}
-          name: SpoofMyDevice v${{ github.event.inputs.version_name }}
-          tag_name: v${{ github.event.inputs.version_name }}
+          files: ${{ steps.apk_metadata.outputs.apk_path }}
+          name: SpoofMyDevice v${{ steps.apk_metadata.outputs.version_name }}
+          tag_name: v${{ steps.apk_metadata.outputs.version_name }}
           draft: false
           prerelease: false
           generate_release_notes: true

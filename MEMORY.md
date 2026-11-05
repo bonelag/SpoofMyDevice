@@ -20,7 +20,7 @@ Last standardized: 2026-11-05 (Asia/Saigon)
 - Product: Android application and legacy Xposed/LSPosed module for per-application device-property spoofing.
 - Application ID: `com.spoofmydevice`
 - Namespace: `com.devicespooflab.hooks`
-- Version: `2.0.4` (`versionCode` 13)
+- Version: `2.0.5` (`versionCode` 13)
 - SDK levels: `minSdk` 26, `targetSdk` 37, `compileSdk` 37
 - UI stack: Kotlin, Jetpack Compose, Material 3, and Miuix.
 - Hook stack: Java and the legacy Xposed API from the local `api-82.jar`.
@@ -127,7 +127,7 @@ Last standardized: 2026-11-05 (Asia/Saigon)
 - Added UI-style strings to default, Simplified Chinese, Korean, and Japanese resources.
 - Corrected the `ToggleableState` import to `androidx.compose.ui.state.ToggleableState`.
 - Removed unintended UTF-8 byte-order marks from edited source files.
-- Version remains `2.0.4`; no version bump was made for this work.
+- Version remains `2.0.5`; no version bump was made for this work.
 
 ## Verification Record
 
@@ -156,12 +156,12 @@ Last standardized: 2026-11-05 (Asia/Saigon)
 
 ## Boot-Fix APK Artifact
 
-- Path: `F:/Code/SpoofMyDevice/release/SpoofMyDevice-2.0.4-bootfix.apk`
-- Checksum file: `release/SpoofMyDevice-2.0.4-bootfix.apk.sha256`
+- Path: `F:/Code/SpoofMyDevice/release/SpoofMyDevice-2.0.5-bootfix.apk`
+- Checksum file: `release/SpoofMyDevice-2.0.5-bootfix.apk.sha256`
 - Size: 26,236,882 bytes
 - SHA-256: `92DE78E2786EA73A0B4B96F94B0297B9FDB10B9852329B8F06776BF22FD79A0B`
 - Package: `com.spoofmydevice`
-- Version: `2.0.4` (`versionCode` 13)
+- Version: `2.0.5` (`versionCode` 13)
 - SDK metadata: `minSdk` 26, `targetSdk` 37
 - Signature: APK Signature Scheme v2, one Android Debug signer, RSA 2048-bit
 - Certificate SHA-256: `6fd52f5e1da33a135198423d0c8582c787d53ede6da499a3c4841f2b91f216cf`
@@ -242,7 +242,7 @@ Last standardized: 2026-11-05 (Asia/Saigon)
 
 - Reviewed repository instructions and memory, README, Gradle configuration, Android manifest, Xposed registration, application entry points, shared UI state, profile storage/resolution, representative hook implementations, Miuix components and routing, preset loading, Boot Guard source/scripts, CI, investigation notes, and existing test/lint reports.
 - Current baseline: `main` at `a623620` (`Redesign Miuix interface and documentation`). No `.codegraph/` index exists; source inspection used direct reads and ripgrep without creating an index.
-- Source inventory: 55 production Java/Kotlin files, seven JVM test source files, and nine JSON device presets. App metadata remains `com.spoofmydevice`, version `2.0.4` / code 13, minimum API 26, target/compile API 37.
+- Source inventory: 55 production Java/Kotlin files, seven JVM test source files, and nine JSON device presets. App metadata remains `com.spoofmydevice`, version `2.0.5` / code 13, minimum API 26, target/compile API 37.
 - UI flow: `MainActivity` creates `SpoofAppState`; `SpoofMyDeviceApp` selects Material or default Miuix. Both interfaces share profile/settings operations and four destinations: Home, Profiles, Apps, and Settings. Separate activities handle editing, assignment, Safe Mode, diagnostics, and device information.
 - Profile state format version 1 requires at least one saved profile and contains `profiles`, `assignments`, and `globalProperties`. `ConfigFileManager` renders property text with preset/mode metadata. `AppProfileStore` migrates legacy configuration, exports complete state to shared preferences and a best-effort temporary file, and broadcasts configuration changes.
 - Runtime flow: `MainHook` filters eligible first-application processes after real boot readiness, prefetches configuration on a single background executor, validates `Application.attach`, and applies captured/restorable Build values on the main handler. Transport precedence is XSharedPreferences, direct file, then provider; hooks read immutable snapshots. Failed reads preserve prior state, while valid unassignment clears spoofing.
@@ -274,11 +274,32 @@ Last standardized: 2026-11-05 (Asia/Saigon)
 - Added `values-vi/strings.xml` with all 269 translatable app strings, including editor fields, Settings, Home, profile assignment/default controls, dialogs, diagnostics, Safe Mode, and app information. Product names, API identifiers, URLs, and format placeholders were preserved.
 - Removed erroneous `translatable="false"` flags from eight default-profile UI strings and supplied their Korean, Japanese, and Simplified Chinese translations. Added the native language name `Tiếng Việt` to every locale's language picker resources. The existing non-translatable Xposed metadata description remains separate from translated app UI.
 - Added five supported languages (`en`, `vi`, `ko`, `ja`, `zh-CN`) to `res/xml/locales_config.xml` and linked it from the manifest for Android 13+ app-language settings. Added `tools:targetApi="33"` to document the API-gated manifest attribute; app minimum SDK remains 26.
-- Updated README localization coverage. App version remains `2.0.4` / code 13. No Xposed hook, runtime configuration, Boot Guard, or profile-storage logic was changed.
+- Updated README localization coverage. App version remains `2.0.5` / code 13. No Xposed hook, runtime configuration, Boot Guard, or profile-storage logic was changed.
 - Resource validation parsed every locale, checked duplicate/missing/extra keys and format-placeholder multisets, and confirmed 269 matching strings per locale with zero discrepancies. Newly edited Kotlin and new XML resources were checked for UTF-8 BOMs; none were present.
 - Verification with `JAVA_HOME=F:/Reserve_Engineer/jdk-21`: `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed. All 22 tests across seven suites passed with zero failures/errors/skips. The first lint pass reported one new `UnusedAttribute` warning for `localeConfig`; after the tools API annotation, repeated assemble/lint passed with zero errors and the original 118 warnings. No new test source files were added.
 - Debug APK signature verification passed with APK Signature Scheme v2 and the existing Android Debug certificate SHA-256 `6fd52f5e1da33a135198423d0c8582c787d53ede6da499a3c4841f2b91f216cf`. AAPT inspection confirmed package/version metadata, the Vietnamese application label, and all five packaged locale-config entries.
-- Review artifact: `release/SpoofMyDevice-2.0.4-miuix-vi.apk`, 29,381,580 bytes, SHA-256 `D1A0E8E09696FFD70A6647C644A0A2DF68EBA8F025A31CB17A533EC91DE6D0F4`; adjacent `.sha256` file records the checksum.
+- Review artifact: `release/SpoofMyDevice-2.0.5-miuix-vi.apk`, 29,381,580 bytes, SHA-256 `D1A0E8E09696FFD70A6647C644A0A2DF68EBA8F025A31CB17A533EC91DE6D0F4`; adjacent `.sha256` file records the checksum.
 - ADB detected a connected device reporting model `V2507A`, API 35, 1080x2400 display, and font scale 1.0. Existing internal-file inspection through `run-as` failed with `readable or writable by others: 40755`; the pre-installed provider also could not be found by the `content` CLI. A readable shared temporary export contained five profiles and two assignments; only counts and a canonical JSON hash were recorded in `build/qa/miuix-editor-vi/device-baseline.json`.
 - Launched the existing companion activity once and prepared an ignored local UI-inspection helper at `build/qa/miuix-editor-vi/device_ui.py`. Capture was stopped by its foreground-app guard because another app was active. No screenshot was captured, new APK installed, device setting/profile modified, target app restarted, or reboot performed. Live visual confirmation remains outstanding; ADB connectivity does not validate the earlier boot-hang fix.
 - Preserved earlier memory changes and the untracked `LSPosed-v2.2.1.zip`. No commit, push, tag, or published release was made. Final documentation/source validation used `git diff --check`.
+
+## Automatic Release Version Workflow, 2026-11-05
+
+- Updated `.github/workflows/android.yml` to remove the required `workflow_dispatch.inputs.version_name` input while retaining manual workflow dispatch.
+- The workflow builds `:app:assembleDebug`, then reads `app/build/outputs/apk/debug/output-metadata.json` using Python's standard library. It selects the current single APK artifact's `versionName` and `outputFile`, verifies that the version is a non-empty string and the APK exists, and exports `version_name` and `apk_path` through `GITHUB_OUTPUT`.
+- Release asset selection, release name `SpoofMyDevice v<versionName>`, and tag `v<versionName>` now use the built artifact's metadata. Replaced the previous `find | head` APK selection and renamed the inaccurate minified-debug build step to `Build Debug APK`.
+- Updated the README workflow paragraph to explain automatic version detection. Preserved the user's existing `2.0.5` changes in Gradle, README, and prior memory entries; no application source or version configuration was edited in this task. Baseline HEAD was `c16d07f` (`Fix loi UI, them tieng viet`, transliterated description).
+- Verification: downloaded actionlint 1.7.12 from its official GitHub release into ignored `build/workflow-check/`; workflow validation passed. Local `gradlew.bat --no-daemon :app:assembleDebug` passed with the existing JDK 21 environment.
+- Existing metadata initially still reported `2.0.4` despite the source configuration being `2.0.5`. The fresh build generated `2.0.5` metadata, confirming why version extraction belongs after the build.
+- Executed the exact Python `run` block from the workflow locally with a temporary `GITHUB_OUTPUT` file. Outputs selected `app/build/outputs/apk/debug/app-debug.apk` and version `2.0.5`; independent AAPT inspection confirmed the APK manifest version matched. Local release-field resolution produced name `SpoofMyDevice v2.0.5` and tag `v2.0.5`.
+- Saved local validation outputs to `build/workflow-check/metadata-outputs.txt` and `build/workflow-check/verification.json`. No new test source files were added and unrelated JVM/lint/device checks were not rerun.
+- `git diff --check` passed. No GitHub workflow was triggered, and no release, remote tag, commit, or push was created during local verification.
+
+## Release Workflow Commit and Push, 2026-11-05
+
+- The user authorized committing and pushing the pending automatic-version workflow, app version `2.0.5`, README, and memory changes.
+- Target: `main` on `origin` (`https://github.com/bonelag/SpoofMyDevice`). A fresh fetch confirmed local HEAD and `origin/main` both at `c16d07f`, with no divergence.
+- Commit scope: `.github/workflows/android.yml`, `app/build.gradle.kts`, `README.md`, and `MEMORY.md`. Existing user-authored version changes are included; ignored build artifacts and local investigation inputs are outside this scope.
+- Commit message: `Automate release version detection for 2.0.5`.
+- Verification remains the successful actionlint check, fresh debug build, and workflow metadata extraction matching APK version `2.0.5`. Whitespace checks were repeated; no additional Gradle or device tasks were required.
+- Publication procedure: stage the four reviewed files, create the commit, use ordinary `git push origin main`, and verify remote HEAD plus clean working-tree status. No force push, release tag, or workflow dispatch is part of this operation.
