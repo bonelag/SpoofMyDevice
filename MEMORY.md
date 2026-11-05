@@ -333,3 +333,24 @@ Mọi thao tác trong các lượt tiếp theo phải được ghi vào MEMORY.m
 
 
 Kết quả xác minh thao tác ghi: prefix 34179 byte lịch sử cũ giữ nguyên; SHA-256 lịch sử trước ghi 51C69EC61CD571D27038A17EDD86B82B5711D3FE06FFA6715F8FD89B0C793258; mục nhật ký mới đã ghi thành công.
+
+## Lượt 2026-11-05: lời chào
+
+1. Nhận lời chào "hi" và hướng dẫn AGENTS.md được cung cấp trong phiên.
+2. Báo rằng hướng dẫn dự án yêu cầu đọc MEMORY.md và ghi công việc của phiên.
+3. Đọc MEMORY.md bằng Get-Content -Raw; đầu ra bị cắt. Đọc bổ sung dòng 101–210 và 211–255 bằng Select-Object để lấy phần bị cắt. Tiếp nhận bối cảnh APK bootfix, kết quả kiểm tra cũ và giới hạn chưa kiểm chứng trên thiết bị.
+4. Bổ sung nhật ký này bằng AppendAllText UTF-8; đọc lại byte và xác minh lịch sử cũ giữ nguyên cùng nội dung nhật ký mới.
+5. Phản hồi lời chào "Hi."; không có yêu cầu công việc mới, không sửa mã ứng dụng hoặc chạy build/kiểm thử.
+
+## Lượt 2026-11-05: đọc tổng quan dự án
+
+1. Nhận yêu cầu "Read the project overview". Báo bằng tiếng Việt rằng tổng quan dựa trên MEMORY.md, README và cấu trúc mã hiện tại; giữ ngôn ngữ đã yêu cầu trong lịch sử.
+2. Kiểm tra F:/AGENTS.md, F:/Code/AGENTS.md và AGENTS.md ở root; chỉ AGENTS.md của dự án tồn tại. Đọc nội dung và kiểm tra .codegraph: không có thư mục chỉ mục. Xem metadata công cụ codegraph_explore qua ALL_TOOLS; không gọi CodeGraph, không tạo chỉ mục.
+3. Đọc ba dòng đầu cùng phần MEMORY.md từ dòng 221 đến cuối để cập nhật quy tắc, kết quả bootfix và nhật ký lời chào. Chạy git status --short --branch: main theo dõi origin/main; chỉ MEMORY.md có sửa đổi, khác trạng thái chưa commit của mã trong lịch sử cũ.
+4. Đọc toàn bộ README.md, settings.gradle.kts, build.gradle.kts, gradle.properties, app/build.gradle.kts, app/src/main/AndroidManifest.xml, app/src/main/assets/xposed_init và .github/workflows/android.yml. Liệt kê file trong app/src, ksu_module, presets, docs và .github bằng rg --files, loại ảnh/APK/ZIP.
+5. Đọc MainHook.java, HookSafetyPolicy.java, RuntimeConfigStore.java, MainActivity.kt và ui/SpoofMyDeviceApp.kt. Tìm khai báo/đường gọi trong ui/SpoofAppState.kt; tìm lưu, gán, hồ sơ mặc định và transport trong data/AppProfileStore.java, utils/ConfigManager.java, ConfigProvider.java. Đọc ProfileConfigResolver.java và presets/README.md. Tìm AGENTS.md bằng rg --files --hidden; chỉ có hướng dẫn root. Đầu ra gộp và kết quả tìm kiếm quá rộng bị cắt; không coi phần bị cắt là đã xem.
+6. Đọc lại có giới hạn HookSafetyPolicy.java, RuntimeConfigStore.java, MainActivity.kt; tìm màn hình và phương thức quản lý hồ sơ trong SpoofMyDeviceApp.kt/SpoofAppState.kt. Đọc ConfigManager.java dòng 116–335 và AppProfileStore.java dòng 95–140; tìm cache/GitHub URL trong DevicePresetCatalog.java. Hai đầu ra vượt nhẹ hạn mức, nhưng phần cần cho tổng quan đã hiển thị: luồng worker, thứ tự XSharedPreferences/file/provider và lưu JSON/broadcast.
+7. Xác nhận cấu hình hiện tại: versionName 2.0.4, versionCode 13, applicationId com.spoofmydevice, namespace com.devicespooflab.hooks, minSdk 26, targetSdk/compileSdk 37; giao diện Kotlin/Compose/Material 3, hook Java và API Xposed legacy. AppProfileStore lưu app_profiles.json; hồ sơ gán riêng ưu tiên mặc định; thiếu cả hai giữ thông tin thật. Cấu hình nạp nền, hook đọc snapshot; lỗi transport giữ cấu hình hợp lệ trước. MainHook kiểm tra boot gốc và loại tiến trình được bảo vệ.
+8. Báo tiến độ bằng tiếng Việt: phiên bản 2.0.4 gồm app Compose/module Xposed; hook khởi tạo sau boot, hồ sơ nạp nền; bootfix chưa kiểm chứng trên iQOO. Không chạy lại build/test, không đọc artifact runtime hoặc kết nối thiết bị; kết quả kiểm thử cũ trong MEMORY.md không phải kiểm thử mới.
+9. Bổ sung nhật ký này bằng AppendAllText UTF-8; đọc lại byte xác minh lịch sử cũ giữ nguyên và mục mới đủ nội dung. Chạy git diff --check -- MEMORY.md và git status --short --branch để xác nhận thay đổi giới hạn ở bộ nhớ.
+10. Trả lời tổng quan bằng tiếng Việt: mục đích, giao diện, hook, lưu/áp dụng hồ sơ, yêu cầu runtime, bảo vệ boot và giới hạn chưa thử soft reboot trên thiết bị; cung cấp liên kết README/mã chính/MEMORY.md. Không sửa mã ứng dụng, commit hoặc push.

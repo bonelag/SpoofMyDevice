@@ -103,12 +103,20 @@ fun AppProfilesScreen(appState: SpoofAppState, scaffoldPadding: PaddingValues) {
         appState.ensureInstalledAppsLoaded()
     }
 
-    val visibleApps = remember(appState.installedApps, appState.hideSystemAppsInAppSettings) {
-        if (appState.hideSystemAppsInAppSettings) {
+    val visibleApps = remember(
+        appState.installedApps,
+        appState.hideSystemAppsInAppSettings,
+        appState.profileState,
+    ) {
+        val apps = if (appState.hideSystemAppsInAppSettings) {
             appState.installedApps.filterNot(SafeAppEntry::systemApp)
         } else {
             appState.installedApps
         }
+        apps.sortedWith(
+            compareByDescending<SafeAppEntry> { appState.assignedProfileName(it.packageName) != null }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.label },
+        )
     }
     AppSelectionList(
         apps = visibleApps,
