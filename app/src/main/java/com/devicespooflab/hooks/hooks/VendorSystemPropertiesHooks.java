@@ -1,6 +1,7 @@
 package com.devicespooflab.hooks.hooks;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.IdentityPropertyPolicy;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -50,6 +51,7 @@ public final class VendorSystemPropertiesHooks {
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
                 String key = (String) param.args[0];
+                if (IdentityPropertyPolicy.sensitive(key) && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                 if (shouldKeepRealVersion(packageName, key)) {
                     return;
                 }
@@ -75,6 +77,7 @@ public final class VendorSystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key) && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (shouldKeepRealVersion(packageName, key)) {
                             return;
                         }
@@ -100,6 +103,7 @@ public final class VendorSystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key) && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (shouldKeepRealVersion(packageName, key)) {
                             return;
                         }
@@ -125,6 +129,7 @@ public final class VendorSystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key) && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (shouldKeepRealVersion(packageName, key)) {
                             return;
                         }

@@ -275,4 +275,7 @@
     <string name="profile_default_set_message">已将 %1$s 设为默认配置。</string>
     <string name="profile_default_removed_message">已取消默认配置。</string>
     <string name="app_profile_none_summary_with_default">将使用默认配置（%1$s）。</string>
+    <string name="settings_field_hardware_properties">硬件属性（JSON）</string>
+    <string name="preset_search_hint">搜索预设</string>
+    <string name="preset_search_empty">没有匹配的预设。</string>
 </resources>

@@ -3,6 +3,10 @@ package com.devicespooflab.hooks.hooks;
 import com.devicespooflab.hooks.utils.ConfigManager;
 import com.devicespooflab.hooks.utils.GetPropOutputRewriter;
 import com.devicespooflab.hooks.utils.RewritingProcess;
+import com.devicespooflab.hooks.utils.InteractiveShellProcess;
+import com.devicespooflab.hooks.utils.ScopedHardwareRuntime;
+import com.devicespooflab.hooks.utils.ShellIdentityCommand;
+import com.devicespooflab.hooks.utils.IdentityPaths;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,15 +37,31 @@ public final class GetPropHooks {
                 ProcessBuilder.class,
                 "start",
                 new XC_MethodHook() {
+                    @Override protected void beforeHookedMethod(MethodHookParam param) {
+                        if (!ConfigManager.hasAssignedProfile()) return;
+                        List<String> original = readCommand(param.thisObject);
+                        List<String> wrapped = scopedShellCommand(original);
+                        if (wrapped != null) {
+                            param.setObjectExtra("smd.originalCommand", original);
+                            ((ProcessBuilder) param.thisObject).command(wrapped);
+                        }
+                    }
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        Object saved = param.getObjectExtra("smd.originalCommand");
+                        if (saved instanceof List) ((ProcessBuilder) param.thisObject).command((List<String>) saved);
                         Process originalProcess = (Process) param.getResult();
                         if (originalProcess == null || originalProcess instanceof RewritingProcess
+                            || originalProcess instanceof InteractiveShellProcess
                             || !ConfigManager.hasAssignedProfile()) {
                             return;
                         }
 
                         List<String> command = readCommand(param.thisObject);
+                        if (isInteractiveShell(command)) {
+                            param.setResult(new InteractiveShellProcess(originalProcess, () -> ScopedHardwareRuntime.current().shellScript));
+                            return;
+                        }
                         CommandRequest request = parseRequest(command);
                         if (request == null) {
                             return;
@@ -73,17 +93,34 @@ public final class GetPropHooks {
     private static void hookRuntimeExecVariant(String packageName, Object[] parameterTypes) {
         Object[] hookArgs = Arrays.copyOf(parameterTypes, parameterTypes.length + 1);
         hookArgs[parameterTypes.length] = new XC_MethodHook() {
+            @Override protected void beforeHookedMethod(MethodHookParam param) {
+                if (!ConfigManager.hasAssignedProfile() || !(param.args[0] instanceof String[])) return;
+                String[] original = (String[]) param.args[0];
+                List<String> wrapped = scopedShellCommand(Arrays.asList(original));
+                if (wrapped != null) {
+                    param.setObjectExtra("smd.originalCommand", original);
+                    param.args[0] = wrapped.toArray(new String[0]);
+                }
+            }
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 Process originalProcess = (Process) param.getResult();
                 if (originalProcess == null || originalProcess instanceof RewritingProcess
+                    || originalProcess instanceof InteractiveShellProcess
                     || !ConfigManager.hasAssignedProfile()
                     || param.args.length == 0 || param.args[0] == null) {
                     return;
                 }
 
                 CommandRequest request = null;
-                Object commandArg = param.args[0];
+                Object saved = param.getObjectExtra("smd.originalCommand");
+                Object commandArg = saved == null ? param.args[0] : saved;
+                List<String> command = commandArg instanceof String[] ? Arrays.asList((String[]) commandArg)
+                    : commandArg instanceof String ? Arrays.asList(((String) commandArg).trim().split("\\s+")) : null;
+                if (isInteractiveShell(command)) {
+                    param.setResult(new InteractiveShellProcess(originalProcess, () -> ScopedHardwareRuntime.current().shellScript));
+                    return;
+                }
                 if (commandArg instanceof String) {
                     request = parseShellCommand((String) commandArg);
                 } else if (commandArg instanceof String[]) {
@@ -119,6 +156,17 @@ public final class GetPropHooks {
         return null;
     }
 
+    private static boolean isInteractiveShell(List<String> command) {
+        if (command == null || command.isEmpty() || command.contains("-c")) return false;
+        String name = leafName(command.get(0));
+        return name.equals("su") || name.equals("sh") || name.equals("bash");
+    }
+
+    private static List<String> scopedShellCommand(List<String> command) {
+        ScopedHardwareRuntime.View view = ScopedHardwareRuntime.current();
+        return ShellIdentityCommand.rewrite(command, view.paths, view.shellScript);
+    }
+
     private static CommandRequest parseRequest(List<String> command) {
         if (command == null || command.isEmpty()) {
             return null;
@@ -130,6 +178,10 @@ public final class GetPropHooks {
         }
 
         String first = leafName(normalized.get(0));
+        if ((first.equals("toybox") || first.equals("toolbox") || first.equals("busybox")) && normalized.size() > 1) {
+            normalized = new ArrayList<>(normalized.subList(1, normalized.size()));
+            first = leafName(normalized.get(0));
+        }
         if ("getprop".equals(first)) {
             if (normalized.size() > 3 || (normalized.size() >= 2 && normalized.get(1).startsWith("-"))) {
                 return null;
@@ -141,27 +193,18 @@ public final class GetPropHooks {
         }
 
         if ("uname".equals(first)) {
-            boolean hasM = false;
-            boolean hasA = false;
-            for (String arg : normalized) {
-                if (arg.contains("-m")) hasM = true;
-                if (arg.contains("-a")) hasA = true;
-            }
-            String abi = ConfigManager.getCpuAbi();
-            String arch = (abi != null && abi.contains("arm64")) ? "aarch64" : "armv7l";
-            if (hasM) {
-                return new CommandRequest(arch + "\n");
-            }
-            if (hasA) {
-                return new CommandRequest("Linux localhost 5.15.0 #1 SMP PREEMPT " + arch + "\n");
-            }
-            return new CommandRequest("Linux\n");
+            String output = ConfigManager.hardwareIdentity().unameOutput(normalized.subList(1, normalized.size()));
+            return output == null ? null : new CommandRequest(output);
         }
 
         if ("cat".equals(first) && normalized.size() == 2) {
             String path = normalized.get(1);
             CommandRequest catReq = handleCatCommand(path);
             if (catReq != null) return catReq;
+        }
+        if ("ls".equals(first) && normalized.size() == 2) {
+            List<String> entries = ConfigManager.hardwareIdentity().directories().get(IdentityPaths.normalize(normalized.get(1)));
+            if (entries != null) return new CommandRequest(entries.isEmpty() ? "" : String.join("\n", entries) + "\n");
         }
 
         if (("sh".equals(first) || "su".equals(first)) && normalized.size() >= 3) {
@@ -194,24 +237,9 @@ public final class GetPropHooks {
 
     private static CommandRequest handleCatCommand(String path) {
         if (path == null) return null;
-        if (path.equals("/proc/cpuinfo")) {
-            return new CommandRequest(ConfigManager.getCpuInfoContent());
-        }
-        if (path.startsWith("/sys/devices/system/cpu/")) {
-            if (path.endsWith("/present") || path.endsWith("/online") || path.endsWith("/possible")) {
-                return new CommandRequest("0-" + (ConfigManager.getCpuCores() - 1) + "\n");
-            }
-            if (path.contains("/cache/index3/size")) {
-                return new CommandRequest(ConfigManager.getCacheL3Size() + "\n");
-            }
-            if (path.contains("max_freq")) {
-                return new CommandRequest(ConfigManager.getCpuMaxFreq() + "\n");
-            }
-            if (path.contains("min_freq")) {
-                return new CommandRequest(ConfigManager.getCpuMinFreq() + "\n");
-            }
-        }
-        return null;
+        // All transports use the same per-core content and toggles. No older generic CPU fallback.
+        String content = ConfigManager.hardwareIdentity().files().get(IdentityPaths.normalize(path));
+        return content == null ? null : new CommandRequest(content);
     }
 
     private static Process buildReplacementProcess(Process originalProcess, CommandRequest request, String packageName) {

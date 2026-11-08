@@ -271,4 +271,7 @@
     <string name="profile_default_set_message">%1$sをデフォルトのプロファイルに設定しました。</string>
     <string name="profile_default_removed_message">デフォルトのプロファイルを解除しました。</string>
     <string name="app_profile_none_summary_with_default">デフォルトのプロファイル（%1$s）を使用します。</string>
+    <string name="settings_field_hardware_properties">ハードウェア属性 (JSON)</string>
+    <string name="preset_search_hint">プリセットを検索</string>
+    <string name="preset_search_empty">一致するプリセットがありません。</string>
 </resources>

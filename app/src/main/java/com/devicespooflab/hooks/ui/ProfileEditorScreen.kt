@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +47,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,9 +59,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.devicespooflab.hooks.R
 import com.devicespooflab.hooks.data.DevicePreset
@@ -70,6 +74,7 @@ internal data class EditorField(
     val labelRes: Int,
     val numeric: Boolean = false,
     val multiline: Boolean = false,
+    val toggleable: Boolean = true,
 )
 
 internal val socFields = listOf(
@@ -90,6 +95,7 @@ internal val socFields = listOf(
     EditorField(ConfigManager.FIELD_CPU_ABI_LIST, R.string.settings_field_cpu_abi_list),
     EditorField(ConfigManager.FIELD_CPU_ABI_LIST_64, R.string.settings_field_cpu_abi_list_64),
     EditorField(ConfigManager.FIELD_CPU_ABI_LIST_32, R.string.settings_field_cpu_abi_list_32),
+    EditorField(ConfigManager.FIELD_HARDWARE_PROPERTIES, R.string.settings_field_hardware_properties, multiline = true, toggleable = false),
 )
 
 internal val systemFields = listOf(
@@ -461,6 +467,7 @@ private fun PresetSelector(
     onPresetSelected: ((DevicePreset) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
     val editor = appState.editor
     val selectedLabel = appState.presets.firstOrNull { it.id == editor.selectedPresetId }?.displayName.orEmpty()
 
@@ -478,29 +485,62 @@ private fun PresetSelector(
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .fillMaxWidth(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            appState.presets.forEach { preset ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(preset.displayName)
-                            if (preset.summary.isNotBlank()) {
-                                Text(
-                                    preset.summary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+    }
+    if (expanded) {
+        AlertDialog(
+            onDismissRequest = { expanded = false },
+            title = { Text(stringResource(R.string.settings_hint_preset)) },
+            text = {
+                PresetPickerContent(
+                    presets = appState.presets,
+                    scrollbarColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    searchField = { query, onQueryChange ->
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = onQueryChange,
+                            label = { Text(stringResource(R.string.preset_search_hint)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    emptyContent = {
+                        Text(
+                            text = stringResource(R.string.preset_search_empty),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp),
+                        )
+                    },
+                ) { preset, _ ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(preset.displayName)
+                                if (preset.summary.isNotBlank()) {
+                                    Text(
+                                        preset.summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
-                        }
-                    },
-                    onClick = {
-                        editor.selectPreset(preset)
-                        onPresetSelected?.invoke(preset)
-                        expanded = false
-                    },
-                )
-            }
-        }
+                        },
+                        onClick = {
+                            editor.selectPreset(preset)
+                            onPresetSelected?.invoke(preset)
+                            keyboard?.hide()
+                            expanded = false
+                        },
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { expanded = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -517,7 +557,7 @@ private fun ProfileEditorField(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(
+        if (field.toggleable) Checkbox(
             checked = spoofEnabled,
             onCheckedChange = { editor.enabledFields[field.fieldId] = it },
         )
@@ -531,7 +571,7 @@ private fun ProfileEditorField(
             label = { Text(stringResource(field.labelRes)) },
             enabled = spoofEnabled,
             minLines = if (field.multiline) 2 else 1,
-            maxLines = if (field.multiline) 5 else 1,
+            maxLines = if (field.fieldId == ConfigManager.FIELD_HARDWARE_PROPERTIES) Int.MAX_VALUE else if (field.multiline) 5 else 1,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (field.numeric) KeyboardType.Number else KeyboardType.Text,
             ),

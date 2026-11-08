@@ -2,7 +2,7 @@
   "id": "pixel_11_pro",
   "brandLabel": "Google",
   "modelLabel": "Pixel 11 Pro",
-  "summary": "Tensor G6 - Android 17",
+  "summary": "Synthetic Tensor G6 - 16 GiB RAM / 256 GiB storage - Android 17",
   "profile": {
     "brand": "google",
     "manufacturer": "Google",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "26.1.0",
     "vulkanLevel": 1,
     "cpuHardware": "Google Tensor G6",
-    "cpuCores": 7
+    "cpuCores": 7,
+    "hardwareProperties": {
+      "hardware.market_name": "Pixel 11 Pro",
+      "hardware.ram_bytes": "17179869184",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "powervr",
+      "cpu.max_frequencies": "2250000,2250000,2250000,2250000,3050000,3050000,4110000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd80,0xd80,0xd80,0xd80,0xd87,0xd87,0xd82",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "16384K",
+      "kernel.release": "6.12.0-android17-malibu",
+      "kernel.version": "#1 SMP PREEMPT Thu Aug 20 00:00:00 UTC 2026",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

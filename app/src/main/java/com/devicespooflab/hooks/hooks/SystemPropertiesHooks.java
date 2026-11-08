@@ -1,6 +1,7 @@
 package com.devicespooflab.hooks.hooks;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.IdentityPropertyPolicy;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -47,6 +48,8 @@ public class SystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key)
+                            && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (ConfigManager.shouldBypassVersionSpoof(packageName) && isVersionProperty(key)) {
                             return;
                         }
@@ -71,6 +74,8 @@ public class SystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key)
+                            && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (ConfigManager.shouldBypassVersionSpoof(packageName) && isVersionProperty(key)) {
                             return;
                         }
@@ -95,6 +100,8 @@ public class SystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key)
+                            && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (ConfigManager.shouldBypassVersionSpoof(packageName) && isVersionProperty(key)) {
                             return;
                         }
@@ -122,6 +129,8 @@ public class SystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key)
+                            && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (ConfigManager.shouldBypassVersionSpoof(packageName) && isVersionProperty(key)) {
                             return;
                         }
@@ -147,6 +156,8 @@ public class SystemPropertiesHooks {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         String key = (String) param.args[0];
+                        if (IdentityPropertyPolicy.sensitive(key)
+                            && IdentityPropertyPolicy.preservePlatformCaller(key, Thread.currentThread().getStackTrace())) return;
                         if (ConfigManager.shouldBypassVersionSpoof(packageName) && isVersionProperty(key)) {
                             return;
                         }

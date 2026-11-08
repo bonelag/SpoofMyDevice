@@ -501,6 +501,16 @@ public class DevicePresetCatalog {
         profile.setVulkanLevel(jsonObject.optInt("vulkanLevel", 1));
         profile.setCpuHardware(jsonObject.optString("cpuHardware"));
         profile.setCpuCores(jsonObject.optInt("cpuCores", 8));
+        JSONObject hardware = jsonObject.optJSONObject("hardwareProperties");
+        if (hardware != null) {
+            java.util.Map<String, String> entries = new java.util.LinkedHashMap<>();
+            java.util.Iterator<String> keys = hardware.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                if (ConfigFileManager.isHardwareProperty(key)) entries.put(key, hardware.optString(key));
+            }
+            profile.setHardwareProperties(entries);
+        }
         return profile;
     }
 }

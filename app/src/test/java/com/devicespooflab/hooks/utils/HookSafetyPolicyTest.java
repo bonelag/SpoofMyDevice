@@ -38,6 +38,35 @@ public class HookSafetyPolicyTest {
     }
 
     @Test
+    public void companionActivationCannotRunInsideAProtectedHost() {
+        String companion = "com.spoofmydevice";
+        assertFalse(HookSafetyPolicy.canInitializePackage(true, companion, "system_server", 1000, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(true, companion, "system_server", 101000, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(true, companion, "zygote64", 0, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(true, companion, companion, 10123, 1));
+    }
+
+    @Test
+    public void secondaryLoadedPackagesCannotInitializeEvenTheCompanion() {
+        assertFalse(HookSafetyPolicy.canInitializePackage(
+            false, "com.spoofmydevice", "com.example.host", 10123, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(
+            false, "com.example.library", "com.example.host", 10123, 0));
+    }
+
+    @Test
+    public void primaryOrdinaryAppsAndTheCompanionRemainEligible() {
+        assertTrue(HookSafetyPolicy.canInitializePackage(
+            true, "com.spoofmydevice", "com.spoofmydevice", 10123, 0));
+        assertTrue(HookSafetyPolicy.canInitializePackage(
+            true, "com.example.app", "com.example.app:worker", 110123, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(
+            true, "com.example.app", "com.example.app", 99001, 0));
+        assertFalse(HookSafetyPolicy.canInitializePackage(
+            true, "com.example.app", "com.example.app", 10123, 128));
+    }
+
+    @Test
     public void profilesCannotOverrideRuntimeBootControlProperties() {
         assertTrue(HookSafetyPolicy.isRuntimeStateProperty("sys.boot_completed"));
         assertTrue(HookSafetyPolicy.isRuntimeStateProperty("init.svc.bootanim"));

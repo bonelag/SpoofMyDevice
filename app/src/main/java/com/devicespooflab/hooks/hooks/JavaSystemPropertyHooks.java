@@ -52,24 +52,8 @@ public final class JavaSystemPropertyHooks {
         if (key == null || key.isEmpty()) {
             return null;
         }
-        if ("os.arch".equals(key)) {
-            String abi = ConfigManager.getCpuAbi();
-            if (abi == null) {
-                return null;
-            }
-            if (abi.contains("arm64")) {
-                return "aarch64";
-            }
-            if (abi.contains("armeabi")) {
-                return "arm";
-            }
-            if (abi.contains("x86_64")) {
-                return "x86_64";
-            }
-            if (abi.contains("x86")) {
-                return "x86";
-            }
-            return abi;
+        if (key.equals("os.arch") || key.equals("os.version") || key.equals("os.name")) {
+            return ConfigManager.hardwareIdentity().javaProperty(key);
         }
         if ("http.agent".equals(key)) {
             return ConfigManager.getWebViewUserAgent();

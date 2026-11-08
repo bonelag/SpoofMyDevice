@@ -719,6 +719,15 @@ class ProfileEditorState {
             vulkanLevel = value(ConfigManager.FIELD_VULKAN_LEVEL).toIntOrNull() ?: vulkanLevel
             cpuHardware = value(ConfigManager.FIELD_CPU_HARDWARE)
             cpuCores = value(ConfigManager.FIELD_CPU_CORES).toIntOrNull() ?: cpuCores
+            val extraHardware = org.json.JSONObject(value(ConfigManager.FIELD_HARDWARE_PROPERTIES).ifBlank { "{}" })
+            val parsedHardware = linkedMapOf<String, String>()
+            extraHardware.keys().forEach { key ->
+                val entry = extraHardware.getString(key)
+                require(ConfigFileManager.isHardwareProperty(key) && key.matches(Regex("[A-Za-z0-9_.-]+"))) { "Invalid hardware property: $key" }
+                require(!entry.contains('\n') && !entry.contains('\r') && !entry.contains('\u0000')) { "Hardware values must fit one line: $key" }
+                parsedHardware[key] = entry
+            }
+            hardwareProperties = parsedHardware
         }
     }
 
@@ -814,6 +823,7 @@ class ProfileEditorState {
         values[ConfigManager.FIELD_VULKAN_LEVEL] = if (profile.vulkanLevel > 0) profile.vulkanLevel.toString() else "1"
         values[ConfigManager.FIELD_CPU_HARDWARE] = profile.cpuHardware.orEmpty()
         values[ConfigManager.FIELD_CPU_CORES] = if (profile.cpuCores > 0) profile.cpuCores.toString() else "8"
+        values[ConfigManager.FIELD_HARDWARE_PROPERTIES] = org.json.JSONObject(profile.hardwareProperties).toString(2)
     }
 
     private fun value(fieldId: String): String = values[fieldId].orEmpty().trim()

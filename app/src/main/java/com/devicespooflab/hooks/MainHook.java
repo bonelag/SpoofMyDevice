@@ -16,6 +16,7 @@ import com.devicespooflab.hooks.hooks.DisplayHooks;
 import com.devicespooflab.hooks.hooks.EmulatorDetectionHooks;
 import com.devicespooflab.hooks.hooks.GetPropHooks;
 import com.devicespooflab.hooks.hooks.HardwareHooks;
+import com.devicespooflab.hooks.hooks.IdentitySurfaceHooks;
 import com.devicespooflab.hooks.hooks.JavaSystemPropertyHooks;
 import com.devicespooflab.hooks.hooks.LocaleHooks;
 import com.devicespooflab.hooks.hooks.MediaDrmHooks;
@@ -28,6 +29,9 @@ import com.devicespooflab.hooks.hooks.VendorSystemPropertiesHooks;
 import com.devicespooflab.hooks.hooks.WebViewHooks;
 import com.devicespooflab.hooks.utils.ConfigManager;
 import com.devicespooflab.hooks.utils.HookSafetyPolicy;
+import com.devicespooflab.hooks.utils.NativeIdentity;
+import com.devicespooflab.hooks.utils.ScopedHardwareRuntime;
+import com.devicespooflab.hooks.utils.StartupConfigLoad;
 
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -35,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import de.robv.android.xposed.XC_MethodHook;
@@ -75,31 +80,28 @@ public class MainHook implements IXposedHookLoadPackage {
         }
     }
 
-    private static boolean isSystemCriticalPackage(XC_LoadPackage.LoadPackageParam lpparam) {
+    private static boolean isEligibleApplication(XC_LoadPackage.LoadPackageParam lpparam) {
         if (lpparam.appInfo == null) {
-            return true;
+            return false;
         }
         try {
-            return HookSafetyPolicy.isProtectedProcess(
+            return HookSafetyPolicy.canInitializePackage(
+                lpparam.isFirstApplication,
                 lpparam.packageName,
                 lpparam.processName,
                 android.os.Process.myUid(),
                 lpparam.appInfo.flags
             );
         } catch (Throwable ignored) {
-            return true;
+            return false;
         }
     }
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) {
-        if (MODULE_PACKAGE.equals(lpparam.packageName)) {
-            hookActivationCheck(lpparam);
-            return;
-        }
-
-        // A package loaded by another app or a system host must not configure that process.
-        if (!lpparam.isFirstApplication || isSystemCriticalPackage(lpparam)) {
+        // The companion APK can also be loaded by another app or a system host.
+        // Do not resolve its UI classes or install activation hooks in those processes.
+        if (!isEligibleApplication(lpparam)) {
             return;
         }
 
@@ -109,14 +111,19 @@ public class MainHook implements IXposedHookLoadPackage {
             return;
         }
 
+        if (MODULE_PACKAGE.equals(lpparam.packageName)) {
+            hookActivationCheck(lpparam);
+            return;
+        }
+
         String processName = lpparam.processName == null ? lpparam.packageName : lpparam.processName;
         HookSession session = new HookSession(lpparam);
         if (HOOK_SESSIONS.putIfAbsent(processName, session) != null) {
             return;
         }
-        ConfigManager.init(lpparam.packageName);
+        // Only register lifecycle hooks here; no configuration transport under LoadedApk locks.
+        hookApplicationCreationForInitialization(lpparam, session);
         hookApplicationAttachForInitialization(lpparam, session);
-        session.requestReload();
     }
 
     private void initializeHooks(XC_LoadPackage.LoadPackageParam lpparam) {
@@ -127,6 +134,9 @@ public class MainHook implements IXposedHookLoadPackage {
 
         // Capture real fields before SystemProperties hooks can affect Build initialization.
         BuildHooks.captureOriginals(lpparam.classLoader);
+
+        NativeIdentity.install();
+        IdentitySurfaceHooks.hook(lpparam);
 
         try {
             SystemPropertiesHooks.hook(lpparam);
@@ -248,6 +258,19 @@ public class MainHook implements IXposedHookLoadPackage {
         XposedBridge.log(TAG + ": All hooks initialized for " + lpparam.packageName);
     }
 
+    private void hookApplicationCreationForInitialization(XC_LoadPackage.LoadPackageParam lpparam, HookSession session) {
+        try {
+            XposedHelpers.findAndHookMethod("android.app.Instrumentation", lpparam.classLoader, "newApplication",
+                ClassLoader.class, String.class, Context.class, new XC_MethodHook() {
+                    @Override protected void beforeHookedMethod(MethodHookParam param) {
+                        session.prepareStartup((Context) param.args[2]);
+                    }
+                });
+        } catch (Throwable unavailable) {
+            XposedBridge.log(TAG + ": Early application creation hook unavailable: " + unavailable);
+        }
+    }
+
     private void hookApplicationAttachForInitialization(
         XC_LoadPackage.LoadPackageParam lpparam,
         HookSession session
@@ -259,19 +282,28 @@ public class MainHook implements IXposedHookLoadPackage {
                 "attach",
                 android.content.Context.class,
                 new XC_MethodHook() {
+                    @Override protected void beforeHookedMethod(MethodHookParam param) {
+                        session.prepareStartup((Context) param.args[0]);
+                    }
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
-                        if (!isBootReady()) {
+                        if (!isEligibleApplication(lpparam) || !isBootReady()) {
                             return;
                         }
                         try {
                             Context context = (Context) param.args[0];
-                            if (!lpparam.packageName.equals(context.getPackageName())) {
+                            if (context == null || !lpparam.packageName.equals(context.getPackageName())) {
                                 return;
                             }
+                            Looper mainLooper = Looper.getMainLooper();
+                            if (mainLooper == null) {
+                                return;
+                            }
+                            ConfigManager.init(lpparam.packageName);
+                            if (session.mainHandler == null) session.mainHandler = new Handler(mainLooper);
                             session.context = context;
-                            // Prefetch may already have finished. This reads memory only.
-                            session.applyCurrentConfig();
+                            // The worker posts hook installation after the attach callback returns.
+                            XposedBridge.log(TAG + ": Config loader attached for " + lpparam.packageName);
                             session.requestReload();
                         } catch (Throwable throwable) {
                             XposedBridge.log(TAG + ": Failed to initialize hooks after attach for " + lpparam.packageName + ": " + throwable.getMessage());
@@ -319,17 +351,43 @@ public class MainHook implements IXposedHookLoadPackage {
 
     private final class HookSession {
         private final XC_LoadPackage.LoadPackageParam lpparam;
-        private final Handler mainHandler = new Handler(Looper.getMainLooper());
         private final AtomicBoolean reloadRequested = new AtomicBoolean();
         private final AtomicBoolean reloadRunning = new AtomicBoolean();
+        private final AtomicBoolean startupStarted = new AtomicBoolean();
+        private volatile Handler mainHandler;
         private volatile Context context;
 
         private HookSession(XC_LoadPackage.LoadPackageParam lpparam) {
             this.lpparam = lpparam;
         }
 
+        private void prepareStartup(Context suppliedContext) {
+            if (suppliedContext == null || !lpparam.packageName.equals(suppliedContext.getPackageName())
+                || !isEligibleApplication(lpparam) || !isBootReady() || Looper.getMainLooper() == null
+                || !startupStarted.compareAndSet(false, true)) return;
+            ConfigManager.init(lpparam.packageName);
+            mainHandler = new Handler(Looper.getMainLooper());
+            context = suppliedContext;
+            FutureTask<Boolean> localLoad = new FutureTask<>(() -> {
+                if (!isBootReady()) return false;
+                try {
+                    return ConfigManager.loadStartupCache(suppliedContext,
+                        snapshot -> ScopedHardwareRuntime.prepare(suppliedContext, snapshot));
+                } finally {
+                    mainHandler.post(this::applyCurrentConfig);
+                }
+            });
+            ConfigWorker.EXECUTOR.execute(localLoad);
+            if (!StartupConfigLoad.await(localLoad)) {
+                XposedBridge.log(TAG + ": Startup cache unavailable within bounded deadline for " + lpparam.packageName);
+            }
+            // The lightweight snapshot may be ready while virtual-file preparation is still
+            // running. Do not defer property/Build hooks past Application.onCreate in that case.
+            if (isBootReady()) applyCurrentConfig();
+        }
+
         private void requestReload() {
-            if (!isBootReady()) {
+            if (context == null || mainHandler == null || !isBootReady()) {
                 return;
             }
             reloadRequested.set(true);
@@ -347,11 +405,14 @@ public class MainHook implements IXposedHookLoadPackage {
                     }
                     try {
                         Context attachedContext = context;
-                        if (attachedContext != null) {
-                            registerConfigChangeReceiver(attachedContext, this);
+                        Handler attachedHandler = mainHandler;
+                        if (attachedContext == null || attachedHandler == null) {
+                            return;
                         }
-                        if (ConfigManager.forceReload(attachedContext)) {
-                            mainHandler.post(this::applyCurrentConfig);
+                        registerConfigChangeReceiver(attachedContext, this);
+                        if (ConfigManager.forceReload(attachedContext,
+                            snapshot -> ScopedHardwareRuntime.prepare(attachedContext, snapshot))) {
+                            attachedHandler.post(this::applyCurrentConfig);
                         }
                     } catch (Throwable throwable) {
                         XposedBridge.log(TAG + ": Background config load failed for "
@@ -369,7 +430,7 @@ public class MainHook implements IXposedHookLoadPackage {
 
         private void applyCurrentConfig() {
             Context attachedContext = context;
-            if (attachedContext == null || !isBootReady()) {
+            if (attachedContext == null || !isEligibleApplication(lpparam) || !isBootReady()) {
                 return;
             }
             try {

@@ -269,4 +269,7 @@
     <string name="profile_default_set_message">Đã đặt %1$s làm hồ sơ mặc định.</string>
     <string name="profile_default_removed_message">Đã bỏ hồ sơ mặc định.</string>
     <string name="app_profile_none_summary_with_default">Sẽ dùng hồ sơ mặc định (%1$s).</string>
+    <string name="settings_field_hardware_properties">Thuộc tính phần cứng (JSON)</string>
+    <string name="preset_search_hint">Tìm mẫu thiết bị</string>
+    <string name="preset_search_empty">Không có mẫu thiết bị phù hợp.</string>
 </resources>

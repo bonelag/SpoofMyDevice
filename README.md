@@ -4,7 +4,7 @@
 
 **Per-application Android device-profile spoofing for Xposed-compatible runtimes.**
 
-[![Version](https://img.shields.io/badge/version-2.0.5-4f46e5)](https://github.com/BuSung-dev/SpoofMyDevice/releases)
+[![Version](https://img.shields.io/badge/version-2.0.6-4f46e5)](https://github.com/bonelag/SpoofMyDevice/releases)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-3ddc84?logo=android&logoColor=white)](#requirements)
 [![Xposed API](https://img.shields.io/badge/Xposed_API-93%2B-f97316)](#requirements)
 [![Java](https://img.shields.io/badge/Java-17-007396?logo=openjdk&logoColor=white)](#build-from-source)
@@ -31,6 +31,7 @@ The project targets controlled compatibility testing, QA, privacy research, and 
 ### Profile management
 
 - Reusable remote presets and fully editable custom profiles
+- 43 configurable preset examples with per-core CPU, RAM/DDR, storage, and graphics metadata
 - Explicit per-application profile assignments
 - Optional default profile for scoped applications without an explicit assignment
 - Per-field controls and identifier randomization
@@ -42,6 +43,7 @@ The project targets controlled compatibility testing, QA, privacy research, and 
 - `Build` and `Build.VERSION` fields
 - Android, vendor, Java, and shell-visible system properties
 - `getprop` and supported direct property-file reads
+- Scoped readonly procfs/sysfs identity views, sensors, RAM/DDR metadata, and persistent shell readers
 - Screen resolution, density, display metrics, and configuration
 - CPU, SoC, ABI, hardware, OpenGL, GLSL, and Vulkan values
 - Locale, timezone, user agent, and WebView behavior
@@ -56,6 +58,7 @@ The project targets controlled compatibility testing, QA, privacy research, and 
 - Dynamic system colors plus static color palettes
 - English, Vietnamese, Korean, Japanese, and Simplified Chinese localization
 - Profile editor, app assignment, Safe Mode, diagnostics, and real-device information screens
+- Searchable preset picker with a bounded scrolling list and draggable scrollbar in both UI styles
 
 ## Architecture
 
@@ -73,10 +76,14 @@ Key runtime properties:
 
 - `MainHook` is registered through `app/src/main/assets/xposed_init`.
 - Profile state is persisted in the companion app's `app_profiles.json` file.
-- Hook callbacks read an immutable in-memory snapshot and do not perform preference, file, or provider I/O.
+- Hook callbacks read in-memory profile data; configuration transport and virtual-file preparation run on the worker.
 - A temporary transport failure preserves the last valid snapshot.
 - A valid unassignment clears the active profile and restores captured `Build` values.
 - Config reload requests are coalesced on a background worker.
+- A validated primary application can prepare a direct-file startup cache before creation with a 100 ms wait limit. Full configuration transport starts on the worker after `Application.attach`; package class-loader callbacks do not start transport.
+- Companion activation checks use the same primary-application, protected-process, and boot checks as target hooks.
+- Active SDK properties are capped at the physical OS API while saved profiles retain their requested values. WebView/Chromium API selection temporarily uses the real SDK.
+- Native hooks guard against tracing reentry and preserve bionic property handles and callback serials.
 
 ## Profile Resolution
 
@@ -134,7 +141,7 @@ Patched APK signatures differ from original signatures. Official updates replace
 
 ## Safe Mode
 
-Safe Mode protects applications that may crash when a profile reports a newer Android release than the physical device. For selected packages, it preserves real values for:
+All active profiles cap the reported SDK/API at the physical OS API, preventing applications from selecting unavailable methods or fields. Safe Mode additionally preserves the remaining real Android-version metadata for selected packages:
 
 - `Build.VERSION` fields
 - `ro.*.build.version.*` properties
@@ -159,9 +166,9 @@ Applications launched before boot readiness retain real values until their proce
 
 An optional KernelSU module is available at `ksu_module/smd_boot_guard` for devices affected by LSPosed soft-reboot black screens. It disables SpoofMyDevice in the LSPosed module database during `post-fs-data`.
 
-Current Boot Guard behavior intentionally requires manual re-enabling after the home screen appears; `service.sh` does not auto-enable the module. Keep Boot Guard installed until several soft reboots succeed with SpoofMyDevice enabled.
+Current Boot Guard behavior intentionally requires manual re-enabling after the home screen appears; `service.sh` does not auto-enable the module. Boot Guard is an optional recovery utility and is not required by the application runtime.
 
-Boot-safety source changes have not yet been verified on the reported iQOO Z10 Turbo Plus / KernelSU / LSPosed 2.2.1 environment. See [Boot Hang Investigation](docs/boot-hang-investigation.md) for evidence, limitations, and the device test procedure.
+The earlier boot-safe APK passed three KernelSU soft reboots on iQOO V2507A / Android API 35 / KernelSU v3.3.1 / LSPosed 2.2.1 with profiles reporting API 35, 36, and 37. SpoofMyDevice stayed enabled and Boot Guard was absent. Later device investigation identified a native tracing deadlock and newer-SDK API-selection crashes. Version 2.0.6 includes native recursion/serial repairs and SDK compatibility guards; the combined version still requires renewed on-device startup, System Extra, and soft-reboot validation. See [Device Validation](docs/boot-safety-validation-2026-11-06.md), [Identity Coverage Repair](docs/identity-coverage-fix-2026-11-06.md), and [Boot Hang Investigation](docs/boot-hang-investigation.md).
 
 ## Preset Sources
 
@@ -202,12 +209,13 @@ Profiles and assignments are stored locally. Source inspection shows direct netw
 
 - JDK 17
 - Android SDK with API 37
+- Android NDK 27.0.12077973 and CMake 3.22.1
 - Git
 
 ### Clone and build
 
 ```bash
-git clone https://github.com/BuSung-dev/SpoofMyDevice.git
+git clone https://github.com/bonelag/SpoofMyDevice.git
 cd SpoofMyDevice
 ./gradlew :app:assembleDebug
 ```
@@ -215,7 +223,7 @@ cd SpoofMyDevice
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/BuSung-dev/SpoofMyDevice.git
+git clone https://github.com/bonelag/SpoofMyDevice.git
 Set-Location SpoofMyDevice
 .\gradlew.bat :app:assembleDebug
 ```
@@ -240,16 +248,19 @@ The GitHub Actions workflow is manual and publishes a debug-signed APK. It reads
 
 | Check | Last recorded result |
 | --- | --- |
-| JVM unit tests | 22 passed; 0 failures; 0 errors |
+| JVM unit tests | 67 passed across 16 suites; 0 failures/errors/skips |
+| Preset catalog/config/identity validation | 43 passed on the host JVM; original nine preset hashes preserved |
 | Current `compileDebugKotlin` | Passed |
 | Current `assembleDebug` | Passed |
-| Current `lintDebug` | Passed with 0 errors and 118 warnings |
-| Soft reboot on reported iQOO device | Not yet verified |
+| Current `lintDebug` | Passed with 0 errors and 122 warnings |
+| Native packaging | ARM64/ARMv7 hooks and x86/x86_64 fallback stubs built successfully |
+| KernelSU soft reboot on V2507A | Earlier boot-safe APK: 3 passed with API 35/36/37 profiles; combined 2.0.6 repairs need renewed device validation |
 
 ## Repository Layout
 
 ```text
 app/
+  src/main/cpp/ Native identity hooks and unsupported-ABI stubs
   src/main/java/com/devicespooflab/hooks/
     data/       Profile storage, preset loading, and settings
     hooks/      Xposed hook groups
@@ -264,7 +275,8 @@ presets/        Community-maintained JSON device profiles
 ## Known Limitations
 
 - Device identity is not changed globally; only supported APIs inside eligible scoped processes are affected.
-- Native code, direct kernel interfaces, hardware-backed attestation, Play Integrity, and server-side risk systems can still reveal the real environment.
+- Unsupported native/raw-syscall paths, hardware-backed attestation, Play Integrity, and server-side risk systems can still reveal the real environment. Native hooks support ARM64/ARMv7; other packaged ABIs use Java fallback.
+- Default component and kernel metadata are synthetic profile values. Exact factory component identities require verified metadata.
 - Applications may cache identifiers before asynchronous profile loading completes.
 - Processes started during boot need a restart after boot readiness.
 - Vendor ROM behavior varies. Test on a recoverable device configuration and keep a rollback path.

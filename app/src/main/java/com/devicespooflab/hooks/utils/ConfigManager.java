@@ -106,11 +106,13 @@ public class ConfigManager {
     public static final String FIELD_VULKAN_LEVEL = "vulkan_level";
     public static final String FIELD_CPU_HARDWARE = "cpu_hardware";
     public static final String FIELD_CPU_CORES = "cpu_cores";
+    public static final String FIELD_HARDWARE_PROPERTIES = "hardware_properties";
 
     private static final RuntimeConfigStore STORE = new RuntimeConfigStore(
         new RuntimeConfigStore.Snapshot(getEmbeddedDefaults(), true)
     );
     private static volatile String targetPackageName;
+    private static final int ACTUAL_RUNTIME_SDK = android.os.Build.VERSION.SDK_INT;
     private static final int MAX_PROFILE_BYTES = 4 * 1024 * 1024;
 
     /** Sets the target only. Preference and provider reads must run on the config worker. */
@@ -124,7 +126,28 @@ public class ConfigManager {
 
     /** Caller must be a background worker, never Application.attach or a hook callback. */
     public static boolean forceReload(Context context) {
-        return STORE.reload(() -> readConfig(context));
+        return STORE.reload(() -> runtimeCompatible(readConfig(context)));
+    }
+
+    public static boolean forceReload(Context context, java.util.function.Consumer<RuntimeConfigStore.Snapshot> prepare) {
+        return STORE.reload(() -> {
+            RuntimeConfigStore.Snapshot next = runtimeCompatible(readConfig(context));
+            if (next != null) prepare.accept(next);
+            return next;
+        });
+    }
+
+    /** Startup cache worker uses no preferences/provider/Binder transport. */
+    public static boolean loadStartupCache(Context context, java.util.function.Consumer<RuntimeConfigStore.Snapshot> prepare) {
+        // First startup has no old assigned view. Publish the lightweight identity before the
+        // worker creates virtual files so Build/marketing/build-description reads can start early.
+        return STORE.reloadForStartup(() -> runtimeCompatible(readFromDirectFiles(targetPackageName, true)), prepare);
+    }
+
+    private static RuntimeConfigStore.Snapshot runtimeCompatible(RuntimeConfigStore.Snapshot next) {
+        if (next == null) return null;
+        return new RuntimeConfigStore.Snapshot(RuntimeApiLevelPolicy.limit(next.properties, ACTUAL_RUNTIME_SDK),
+            next.fromEmbeddedDefaults);
     }
 
     public static boolean isUsingEmbeddedDefaults() {
@@ -133,6 +156,10 @@ public class ConfigManager {
 
     public static boolean hasAssignedProfile() {
         return STORE.current().hasAssignedProfile();
+    }
+
+    public static HardwareIdentity hardwareIdentity() {
+        return STORE.current().hardware;
     }
 
     private static RuntimeConfigStore.Snapshot readConfig(Context preferredContext) {
@@ -212,10 +239,10 @@ public class ConfigManager {
 
     private static RuntimeConfigStore.Snapshot readFromDirectFiles(String packageName, boolean allowDefault) {
         String[] paths = new String[]{
-            "/data/local/tmp/spoofmydevice/app_profiles.json",
-            "/data/user_de/0/com.spoofmydevice/files/app_profiles.json",
             "/data/user/0/com.spoofmydevice/files/app_profiles.json",
-            "/data/data/com.spoofmydevice/files/app_profiles.json"
+            "/data/data/com.spoofmydevice/files/app_profiles.json",
+            "/data/user_de/0/com.spoofmydevice/files/app_profiles.json",
+            "/data/local/tmp/spoofmydevice/app_profiles.json"
         };
         for (String path : paths) {
             try {
@@ -450,6 +477,10 @@ public class ConfigManager {
         if (fieldId != null && !isSpoofEnabled(fieldId)) {
             return defaultValue;
         }
+        String alias = config.hardware.propertyOverride(key);
+        if (alias != null) {
+            return alias;
+        }
         String value = getConfigValue(key);
         if (value != null) {
             return value;
@@ -522,6 +553,10 @@ public class ConfigManager {
         String brand = getBuildBrand();
         String lowerBrand = brand != null ? brand.toLowerCase(Locale.US) : "";
         boolean isNonVivo = !lowerBrand.contains("vivo") && !lowerBrand.contains("iqoo");
+        String soc = hardwareIdentity().value("ro.soc.manufacturer", "").toLowerCase(Locale.ROOT);
+        if (hardwareIdentity().enabled("soc_model") && !soc.contains("mediatek") && !soc.contains("mtk")
+            && (key.startsWith("ro.mediatek.") || key.startsWith("ro.vendor.mediatek.")
+                || key.startsWith("ro.vendor.mtk_") || key.startsWith("ro.mtk."))) return true;
 
         if (isNonVivo) {
             if (key.equals("vendor.gsm.project.baseband")
@@ -567,7 +602,9 @@ public class ConfigManager {
             }
             result.put(key, entry.getValue() == null ? "" : entry.getValue());
         }
-        result.entrySet().removeIf(entry -> isHostLeakProperty(entry.getKey()));
+        result.putAll(config.hardware.propertyAliases());
+        result.entrySet().removeIf(entry -> isHostLeakProperty(entry.getKey())
+            && config.hardware.propertyOverride(entry.getKey()) == null);
         if (!result.containsKey("ro.boot.product.hardware.sku")) {
             String sku = getSystemProperty("ro.boot.product.hardware.sku", "");
             if (!sku.isEmpty()) {
@@ -711,6 +748,10 @@ public class ConfigManager {
     }
 
     public static boolean shouldBypassVersionSpoof(String packageName) {
+        return RuntimeSdkScope.active() || shouldBypassAssignedVersionSpoof(packageName);
+    }
+
+    public static boolean shouldBypassAssignedVersionSpoof(String packageName) {
         if (packageName == null || packageName.trim().isEmpty()) {
             return false;
         }
@@ -750,6 +791,19 @@ public class ConfigManager {
         if (key == null || key.isEmpty()) {
             return null;
         }
+        if (key.contains("marketname") || key.contains("market.name") || key.contains("market_name")
+            || key.contains("marketing_name") || key.equals("ro.product.nickname") || key.equals("ro.config.devicename")
+            || key.equals("persist.sys.devicename") || key.equals("ro.product.publicname") || key.contains(".petname")
+            || key.equals("ro.semc.product.name") || key.equals("ro.vivo.camera.watermark") || key.equals("ro.display.series")
+            || key.equals("ro.product.display") || key.equals("ro.vendor.product.display") || key.equals("ro.vendor.product.ztename")
+            || key.equals("ro.odm.lenovo.series") || key.equals("ro.vendor.asus.product.mkt_name") || key.equals("ro.sh.brand")) return FIELD_MODEL;
+        if (key.equals("ro.soc.model") || key.startsWith("ro.vendor.soc.model") || key.equals("ro.unicpu.model")
+            || key.equals("ro.chipname") || key.equals("ro.hardware.chipname") || key.equals("ro.hardware.alter")
+            || key.equals("ro.board.chiptype")) return FIELD_SOC_MODEL;
+        if (key.equals("ro.soc.manufacturer") || key.equals("ro.vendor.soc.manufacturer")) return FIELD_SOC_MANUFACTURER;
+        if (key.equals("ro.boot.ddr_size") || key.equals("ro.vendor.ddr_size") || key.equals("ro.boot.hardware.ddr")
+            || key.equals("ro.vendor.ram.type") || key.equals("ro.vendor.ddr.type")) return "ram";
+        if (key.equals("ro.hardware.egl") || key.equals("ro.hardware.vulkan") || key.equals("ro.boot.hardware.vulkan")) return FIELD_GPU_RENDERER;
         if (key.equals("ro.product.brand") || key.endsWith(".brand")) {
             return FIELD_BRAND;
         }
@@ -1512,28 +1566,15 @@ public class ConfigManager {
         if (!isSpoofEnabled(FIELD_CPU_CORES)) {
             return 8;
         }
-        String coresStr = getFirstOptionalConfigValue("cpu.cores");
-        if (coresStr != null && !coresStr.isEmpty()) {
-            return parseInt(coresStr, 8);
-        }
-        if (isTensorG6Device()) {
-            return 7;
-        }
-        return isGoogleTensorDevice() ? 9 : 8;
+        return hardwareIdentity().cores;
     }
 
     public static String getHardwareEgl() {
-        if (isTensorG6Device()) {
-            return "powervr";
-        }
-        return isGoogleTensorDevice() ? "mali" : "adreno";
+        return hardwareIdentity().graphicsDriver();
     }
 
     public static String getHardwareVulkan() {
-        if (isTensorG6Device()) {
-            return "powervr";
-        }
-        return isGoogleTensorDevice() ? "mali" : "adreno";
+        return hardwareIdentity().graphicsDriver();
     }
 
     public static String getOpenGlesVersion() {
@@ -1554,71 +1595,19 @@ public class ConfigManager {
     }
 
     public static String getCacheL3Size() {
-        String model = getSocModel().toLowerCase(Locale.US);
-        if (model.contains("elite") || model.contains("sm8750")) {
-            return "16384K";
-        }
-        if (model.contains("tensor g6") || isTensorG6Device()) {
-            return "16384K";
-        }
-        if (model.contains("tensor g5")) {
-            return "12288K";
-        }
-        if (model.contains("tensor")) {
-            return "8192K";
-        }
-        if (model.contains("gen 1") || model.contains("sm8450")) {
-            return "6144K";
-        }
-        return "16384K";
+        return hardwareIdentity().cacheL3();
     }
 
     public static String getCpuMaxFreq() {
-        String model = getSocModel().toLowerCase(Locale.US);
-        if (model.contains("elite") || model.contains("sm8750")) {
-            return "4320000";
-        }
-        if (model.contains("tensor g6") || isTensorG6Device()) {
-            return "4110000";
-        }
-        if (model.contains("tensor g5")) {
-            return "3400000";
-        }
-        if (model.contains("tensor g4")) {
-            return "3100000";
-        }
-        if (model.contains("tensor g3")) {
-            return "2910000";
-        }
-        if (model.contains("tensor g2")) {
-            return "2850000";
-        }
-        return "3200000";
+        return String.valueOf(hardwareIdentity().maxFrequency());
     }
 
     public static String getCpuMinFreq() {
-        return "300000";
+        return hardwareIdentity().minFrequency();
     }
 
     public static String getCpuInfoContent() {
-        int cores = getCpuCores();
-        String cpuHw = getCpuHardware();
-        boolean isTensor = isGoogleTensorDevice();
-        String implementer = isTensor ? "0x41" : "0x51";
-        String part = isTensor ? "0xd46" : "0x001";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < cores; i++) {
-            sb.append("processor\t: ").append(i).append("\n");
-            sb.append("BogoMIPS\t: ").append(isTensor ? "26.00" : "38.40").append("\n");
-            sb.append("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 sve sve2\n");
-            sb.append("CPU implementer\t: ").append(implementer).append("\n");
-            sb.append("CPU architecture: 8\n");
-            sb.append("CPU variant\t: 0x0\n");
-            sb.append("CPU part\t: ").append(part).append("\n");
-            sb.append("CPU revision\t: 0\n\n");
-        }
-        sb.append("Hardware\t: ").append(cpuHw).append("\n");
-        return sb.toString();
+        return hardwareIdentity().cpuInfo();
     }
 
     private static int parseInt(String value, int fallback) {

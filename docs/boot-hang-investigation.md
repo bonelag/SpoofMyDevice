@@ -1,5 +1,7 @@
 # Điều tra treo logo và bản sửa 2.0.4
 
+> Cập nhật 2026-11-06: bản sửa khởi tạo hiện tại đã được cài và kiểm tra qua ADB trên V2507A, KernelSU v3.3.1, LSPosed 2.2.1. Ba lần soft reboot với hồ sơ SDK 35/36/37 đều vào hệ thống, module vẫn bật và không có Boot Guard. Xem [báo cáo kiểm tra thiết bị](boot-safety-validation-2026-11-06.md). Các kết quả và giới hạn bên dưới thuộc lần điều tra lịch sử 2.0.4.
+
 Đã loại bỏ các đường đọc cấu hình và chờ subprocess ngay trên luồng khởi tạo ứng dụng. Chưa có log hoặc thử nghiệm trên thiết bị để xác nhận nguyên nhân cuối cùng của màn hình đen.
 
 ## Phạm vi và bằng chứng

@@ -2,7 +2,7 @@
   "id": "pixel_7_pro",
   "brandLabel": "Google",
   "modelLabel": "Pixel 7 Pro",
-  "summary": "Tensor G2 - Android 15",
+  "summary": "Tensor G2 - 12 GiB RAM / 256 GiB storage - Android 15",
   "profile": {
     "brand": "google",
     "manufacturer": "Google",
@@ -33,7 +33,7 @@
     "simCountryIso": "us",
     "timezone": "America/Los_Angeles",
     "bootloader": "cheetah-15.0-13003188",
-    "socModel": "gs201",
+    "socModel": "Google Tensor G2",
     "socManufacturer": "Google",
     "baseband": "g5300g-240913-250117-B-12918843",
     "buildUser": "android-build",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "38.1.0",
     "vulkanLevel": 1,
     "cpuHardware": "Google Tensor G2",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Pixel 7 Pro",
+      "hardware.ram_bytes": "12884901888",
+      "hardware.ram_type": "LPDDR5",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "mali",
+      "cpu.max_frequencies": "1800000,1800000,1800000,1800000,2350000,2350000,2850000,2850000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd05,0xd05,0xd05,0xd05,0xd41,0xd41,0xd44,0xd44",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "8192K",
+      "kernel.release": "5.10.0-android13-gs201",
+      "kernel.version": "#1 SMP PREEMPT Wed Mar 5 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

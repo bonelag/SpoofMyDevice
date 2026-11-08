@@ -14,7 +14,7 @@ jadx_hw
 # IDE
 .idea/
 *.iml
-
+.cxx
 # OS
 .DS_Store
 Thumbs.db

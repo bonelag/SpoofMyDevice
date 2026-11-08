@@ -21,6 +21,18 @@ public final class HookSafetyPolicy {
         return uid < 0 || appId < FIRST_APPLICATION_UID || appId > LAST_APPLICATION_UID;
     }
 
+    /** Applies to every module entry path, including the companion activation check. */
+    public static boolean canInitializePackage(
+        boolean isFirstApplication,
+        String packageName,
+        String processName,
+        int processUid,
+        int applicationFlags
+    ) {
+        return isFirstApplication
+            && !isProtectedProcess(packageName, processName, processUid, applicationFlags);
+    }
+
     public static boolean isProtectedProcess(
         String packageName,
         String processName,

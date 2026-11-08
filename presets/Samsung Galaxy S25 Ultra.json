@@ -2,7 +2,7 @@
   "id": "galaxy_s25_ultra",
   "brandLabel": "Samsung",
   "modelLabel": "Galaxy S25 Ultra",
-  "summary": "Snapdragon 8 Elite for Galaxy - Android 15",
+  "summary": "Snapdragon 8 Elite for Galaxy - 12 GiB RAM / 256 GiB storage - Android 15",
   "profile": {
     "brand": "samsung",
     "manufacturer": "samsung",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "512.797.0",
     "vulkanLevel": 1,
     "cpuHardware": "Qualcomm Technologies, Inc SM8750",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Galaxy S25 Ultra",
+      "hardware.ram_bytes": "12884901888",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "adreno",
+      "cpu.max_frequencies": "3530000,3530000,3530000,3530000,3530000,3530000,4470000,4470000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0x001,0x001,0x001,0x001,0x001,0x001,0x001,0x001",
+      "cpu.implementer": "0x51",
+      "cpu.cache_l3": "16384K",
+      "kernel.release": "6.6.0-android15-sun",
+      "kernel.version": "#1 SMP PREEMPT Wed Jan 1 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

@@ -2,7 +2,7 @@
   "id": "xiaomi_15_ultra",
   "brandLabel": "Xiaomi",
   "modelLabel": "15 Ultra",
-  "summary": "Snapdragon 8 Elite - Android 15",
+  "summary": "Snapdragon 8 Elite - 16 GiB RAM / 512 GiB storage - Android 15",
   "profile": {
     "brand": "Xiaomi",
     "manufacturer": "Xiaomi",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "512.797.0",
     "vulkanLevel": 1,
     "cpuHardware": "Qualcomm Technologies, Inc SM8750",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Xiaomi 15 Ultra",
+      "hardware.ram_bytes": "17179869184",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "549755813888",
+      "hardware.graphics_driver": "adreno",
+      "cpu.max_frequencies": "3530000,3530000,3530000,3530000,3530000,3530000,4320000,4320000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0x001,0x001,0x001,0x001,0x001,0x001,0x001,0x001",
+      "cpu.implementer": "0x51",
+      "cpu.cache_l3": "16384K",
+      "kernel.release": "6.6.0-android15-sun",
+      "kernel.version": "#1 SMP PREEMPT Wed Jan 1 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

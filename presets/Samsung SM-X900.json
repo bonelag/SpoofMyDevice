@@ -2,16 +2,16 @@
   "id": "sm_x900",
   "brandLabel": "Samsung",
   "modelLabel": "SM-X900",
-  "summary": "Galaxy Tab S8 Ultra (Wi-Fi) - Android 15",
+  "summary": "Galaxy Tab S8 Ultra (Wi-Fi) - 12 GiB RAM / 256 GiB storage - Android 15",
   "profile": {
     "brand": "samsung",
     "manufacturer": "samsung",
     "model": "SM-X900",
     "productName": "gts8uwifixx",
     "deviceCode": "gts8uwifi",
-    "board": "kona",
+    "board": "taro",
     "hardware": "qcom",
-    "boardPlatform": "kona",
+    "boardPlatform": "taro",
     "buildFingerprint": "samsung/gts8uwifixx/gts8uwifi:15/AP3A.240905.015.A2/X900XXS9CYB1:user/release-keys",
     "buildId": "AP3A.240905.015.A2",
     "buildDisplayId": "AP3A.240905.015.A2",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "512.615.0",
     "vulkanLevel": 1,
     "cpuHardware": "Qualcomm Technologies, Inc SM8450",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Galaxy Tab S8 Ultra",
+      "hardware.ram_bytes": "12884901888",
+      "hardware.ram_type": "LPDDR5",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "adreno",
+      "cpu.max_frequencies": "1800000,1800000,1800000,1800000,2500000,2500000,2500000,3000000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd46,0xd46,0xd46,0xd46,0xd47,0xd47,0xd47,0xd48",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "6144K",
+      "kernel.release": "5.10.0-android12-taro",
+      "kernel.version": "#1 SMP PREEMPT Sat Feb 1 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

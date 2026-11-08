@@ -271,4 +271,7 @@
     <string name="profile_default_set_message">%1$s을(를) 기본 프로필로 설정했습니다.</string>
     <string name="profile_default_removed_message">기본 프로필을 해제했습니다.</string>
     <string name="app_profile_none_summary_with_default">기본 프로필(%1$s)을 사용합니다.</string>
+    <string name="settings_field_hardware_properties">하드웨어 속성 (JSON)</string>
+    <string name="preset_search_hint">프리셋 검색</string>
+    <string name="preset_search_empty">일치하는 프리셋이 없습니다.</string>
 </resources>

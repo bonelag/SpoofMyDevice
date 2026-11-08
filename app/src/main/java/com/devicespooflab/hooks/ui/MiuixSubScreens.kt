@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -338,6 +340,7 @@ private fun MiuixPresetSelector(
 ) {
     val editor = appState.editor
     var expanded by remember { mutableStateOf(false) }
+    val keyboard = LocalSoftwareKeyboardController.current
     val selectedLabel = appState.presets.firstOrNull { it.id == editor.selectedPresetId }?.displayName.orEmpty()
 
     MiuixCard(modifier = Modifier.fillMaxWidth()) {
@@ -355,17 +358,48 @@ private fun MiuixPresetSelector(
             title = stringResource(R.string.settings_hint_preset),
             onDismissRequest = { expanded = false },
         ) {
-            Column(Modifier.fillMaxWidth()) {
-                appState.presets.forEachIndexed { index, preset ->
+            Column(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+                PresetPickerContent(
+                    presets = appState.presets,
+                    scrollbarColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f, fill = false),
+                    searchField = { query, onQueryChange ->
+                        TextField(
+                            value = query,
+                            onValueChange = onQueryChange,
+                            label = stringResource(R.string.preset_search_hint),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    emptyContent = {
+                        Text(
+                            text = stringResource(R.string.preset_search_empty),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(12.dp),
+                        )
+                    },
+                ) { preset, showDivider ->
                     MiuixListRow(
                         title = preset.displayName,
                         summary = preset.summary.takeIf(String::isNotBlank),
                         onClick = {
                             editor.selectPreset(preset)
                             onPresetSelected?.invoke(preset)
+                            keyboard?.hide()
                             expanded = false
                         },
-                        showDivider = index < appState.presets.lastIndex,
+                        showDivider = showDivider,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(
+                        text = stringResource(android.R.string.cancel),
+                        onClick = { expanded = false },
                     )
                 }
             }
@@ -444,7 +478,7 @@ private fun MiuixEditorFieldCard(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
-                Checkbox(
+                if (field.toggleable) Checkbox(
                     state = if (spoofEnabled) ToggleableState.On else ToggleableState.Off,
                     onClick = onSpoofToggle,
                     modifier = Modifier.semantics { contentDescription = label },

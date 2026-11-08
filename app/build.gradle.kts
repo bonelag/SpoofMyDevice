@@ -3,6 +3,18 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val shadowhookNative by configurations.creating
+val shadowhookDirectory = layout.buildDirectory.dir("shadowhook-native")
+val prepareShadowhookNative by tasks.registering(Sync::class) {
+    from(provider { zipTree(shadowhookNative.singleFile) }) {
+        include("jni/**/libshadowhook.so", "prefab/modules/shadowhook/include/**")
+    }
+    into(shadowhookDirectory)
+}
+tasks.configureEach {
+    if (name.startsWith("configureCMake") || name.startsWith("buildCMake")) dependsOn(prepareShadowhookNative)
+}
+
 android {
     namespace = "com.devicespooflab.hooks"
     compileSdk = 37
@@ -11,8 +23,13 @@ android {
         applicationId = "com.spoofmydevice"
         minSdk = 26
         targetSdk = 37
-        versionCode = 13
-        versionName = "2.0.5"
+        versionCode = 14
+        versionName = "2.0.6"
+        externalNativeBuild {
+            cmake {
+                arguments += "-DSMD_SHADOWHOOK_DIR=" + shadowhookDirectory.get().asFile.absolutePath.replace('\\', '/')
+            }
+        }
     }
 
     buildTypes {
@@ -34,7 +51,18 @@ android {
         compose = true
     }
 
+    ndkVersion = "27.0.12077973"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     packaging {
+        jniLibs {
+            pickFirsts += "**/libshadowhook.so"
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -57,6 +85,8 @@ dependencies {
     implementation("androidx.compose.material3:material3-window-size-class")
     implementation("com.materialkolor:material-kolor:4.1.1")
     implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.4")
+    implementation("com.bytedance.android:shadowhook:2.0.1")
+    shadowhookNative("com.bytedance.android:shadowhook:2.0.1@aar")
     implementation("com.google.android.material:material:1.14.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

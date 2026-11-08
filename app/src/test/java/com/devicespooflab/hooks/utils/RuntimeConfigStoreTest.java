@@ -3,6 +3,7 @@ package com.devicespooflab.hooks.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -67,6 +68,40 @@ public class RuntimeConfigStoreTest {
         assertEquals("Before", store.current().properties.get("ro.product.model"));
         assertThrows(UnsupportedOperationException.class,
             () -> store.current().properties.put("ro.product.model", "Changed"));
+    }
+
+    @Test
+    public void startupIdentityIsReadableWhileVirtualFilesAreStillBeingPrepared() throws Exception {
+        RuntimeConfigStore store = new RuntimeConfigStore(new RuntimeConfigStore.Snapshot(Collections.emptyMap(), true));
+        CountDownLatch preparing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<Boolean> load = worker.submit(() -> store.reloadForStartup(() -> snapshot("Pixel"), next -> {
+                preparing.countDown();
+                try { release.await(); }
+                catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IllegalStateException(error); }
+            }));
+            assertTrue(preparing.await(2, TimeUnit.SECONDS));
+            assertEquals("Pixel", store.current().properties.get("ro.product.model"));
+            assertTrue(store.current().hasAssignedProfile());
+            assertFalse(StartupConfigLoad.await(load));
+            release.countDown();
+            assertTrue(load.get(2, TimeUnit.SECONDS));
+        } finally {
+            release.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    public void failedStartupAndLiveSnapshotsDoNotUseEarlyPublication() {
+        RuntimeConfigStore store = new RuntimeConfigStore(new RuntimeConfigStore.Snapshot(Collections.emptyMap(), true));
+        assertFalse(store.reloadForStartup(() -> null, next -> { throw new AssertionError("No snapshot to prepare"); }));
+        assertFalse(store.current().hasAssignedProfile());
+        store.reload(() -> snapshot("Assigned"));
+        assertFalse(store.reloadForStartup(() -> { throw new AssertionError("Not a startup snapshot"); }, next -> {}));
+        assertEquals("Assigned", store.current().properties.get("ro.product.model"));
     }
 
     private static RuntimeConfigStore.Snapshot snapshot(String model) {

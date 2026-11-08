@@ -60,6 +60,7 @@ public class DeviceProfile {
     private int vulkanLevel;
     private String cpuHardware;
     private int cpuCores;
+    private java.util.Map<String, String> hardwareProperties = new java.util.LinkedHashMap<>();
 
     public DeviceProfile() {
     }
@@ -120,10 +121,19 @@ public class DeviceProfile {
         this.vulkanLevel = other.vulkanLevel;
         this.cpuHardware = other.cpuHardware;
         this.cpuCores = other.cpuCores;
+        this.hardwareProperties = new java.util.LinkedHashMap<>(other.hardwareProperties);
     }
 
     public DeviceProfile copy() {
         return new DeviceProfile(this);
+    }
+
+    public java.util.Map<String, String> getHardwareProperties() {
+        return java.util.Collections.unmodifiableMap(hardwareProperties);
+    }
+
+    public void setHardwareProperties(java.util.Map<String, String> values) {
+        hardwareProperties = new java.util.LinkedHashMap<>(values);
     }
 
     public void applyFallbacks() {
@@ -293,7 +303,8 @@ public class DeviceProfile {
             && Objects.equals(left.cpuAbiList64, right.cpuAbiList64)
             && Objects.equals(left.cpuAbiList32, right.cpuAbiList32)
             && Objects.equals(left.socModel, right.socModel)
-            && Objects.equals(left.socManufacturer, right.socManufacturer);
+            && Objects.equals(left.socManufacturer, right.socManufacturer)
+            && Objects.equals(left.hardwareProperties, right.hardwareProperties);
     }
 
     public String getDisplayName() {

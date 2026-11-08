@@ -2,7 +2,7 @@
   "id": "pixel_9_pro_xl",
   "brandLabel": "Google",
   "modelLabel": "Pixel 9 Pro XL",
-  "summary": "Tensor G4 - Android 15",
+  "summary": "Tensor G4 - 16 GiB RAM / 256 GiB storage - Android 15",
   "profile": {
     "brand": "google",
     "manufacturer": "Google",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "44.0.0",
     "vulkanLevel": 1,
     "cpuHardware": "Google Tensor G4",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Pixel 9 Pro XL",
+      "hardware.ram_bytes": "17179869184",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "mali",
+      "cpu.max_frequencies": "1950000,1950000,1950000,1950000,2600000,2600000,2600000,3100000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd80,0xd80,0xd80,0xd80,0xd81,0xd81,0xd81,0xd82",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "8192K",
+      "kernel.release": "6.1.0-android14-zumapro",
+      "kernel.version": "#1 SMP PREEMPT Sat Oct 5 00:00:00 UTC 2024",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

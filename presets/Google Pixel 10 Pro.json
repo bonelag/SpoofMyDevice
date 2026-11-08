@@ -2,7 +2,7 @@
   "id": "pixel_10_pro",
   "brandLabel": "Google",
   "modelLabel": "Pixel 10 Pro",
-  "summary": "Tensor G5 - Android 16",
+  "summary": "Tensor G5 - 16 GiB RAM / 256 GiB storage - Android 16",
   "profile": {
     "brand": "google",
     "manufacturer": "Google",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "25.1.0",
     "vulkanLevel": 1,
     "cpuHardware": "Google Tensor G5",
-    "cpuCores": 8
+    "cpuCores": 8,
+    "hardwareProperties": {
+      "hardware.market_name": "Pixel 10 Pro",
+      "hardware.ram_bytes": "17179869184",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "powervr",
+      "cpu.max_frequencies": "2250000,2250000,3050000,3050000,3050000,3050000,3050000,3780000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd80,0xd80,0xd87,0xd87,0xd87,0xd87,0xd87,0xd82",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "12288K",
+      "kernel.release": "6.6.0-android16-laguna",
+      "kernel.version": "#1 SMP PREEMPT Wed Aug 20 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

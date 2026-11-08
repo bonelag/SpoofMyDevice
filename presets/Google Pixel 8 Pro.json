@@ -2,7 +2,7 @@
   "id": "pixel_8_pro",
   "brandLabel": "Google",
   "modelLabel": "Pixel 8 Pro",
-  "summary": "Tensor G3 - Android 15",
+  "summary": "Tensor G3 - 12 GiB RAM / 256 GiB storage - Android 15",
   "profile": {
     "brand": "google",
     "manufacturer": "Google",
@@ -50,6 +50,22 @@
     "vulkanDriverVersion": "44.0.0",
     "vulkanLevel": 1,
     "cpuHardware": "Google Tensor G3",
-    "cpuCores": 9
+    "cpuCores": 9,
+    "hardwareProperties": {
+      "hardware.market_name": "Pixel 8 Pro",
+      "hardware.ram_bytes": "12884901888",
+      "hardware.ram_type": "LPDDR5X",
+      "hardware.storage_bytes": "274877906944",
+      "hardware.graphics_driver": "mali",
+      "cpu.max_frequencies": "1700000,1700000,1700000,1700000,2370000,2370000,2370000,2370000,2910000",
+      "cpu.min_frequency": "300000",
+      "cpu.parts": "0xd46,0xd46,0xd46,0xd46,0xd4d,0xd4d,0xd4d,0xd4d,0xd4e",
+      "cpu.implementer": "0x41",
+      "cpu.cache_l3": "8192K",
+      "kernel.release": "5.15.0-android14-zuma",
+      "kernel.version": "#1 SMP PREEMPT Wed Mar 5 00:00:00 UTC 2025",
+      "kernel.machine": "aarch64",
+      "kernel.hostname": "localhost"
+    }
   }
 }

@@ -1,6 +1,8 @@
 package com.devicespooflab.hooks.hooks;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.RuntimeSdkScope;
+import com.devicespooflab.hooks.utils.NativeIdentity;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -24,6 +26,13 @@ public class BuildHooks {
     private static final Map<String, Object> ORIGINAL_VERSION_FIELDS = new HashMap<>();
     private static boolean serialHookInstalled;
     private static boolean radioHookInstalled;
+    private static final int ACTUAL_SDK = android.os.Build.VERSION.SDK_INT;
+    private static final RuntimeSdkScope RUNTIME_SDK = new RuntimeSdkScope(ACTUAL_SDK,
+        () -> XposedHelpers.getStaticIntField(android.os.Build.VERSION.class, "SDK_INT"),
+        value -> XposedHelpers.setStaticIntField(android.os.Build.VERSION.class, "SDK_INT", value),
+        NativeIdentity::bypassRuntimeVersion);
+
+    public static RuntimeSdkScope.Lease useRuntimeSdk() { return RUNTIME_SDK.enter(); }
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         reapply(lpparam.classLoader, lpparam.packageName);
@@ -71,7 +80,7 @@ public class BuildHooks {
             } else {
                 applyBuildFields(buildClass);
                 if (versionClass != null) {
-                    if (ConfigManager.shouldBypassVersionSpoof(packageName)) {
+                    if (ConfigManager.shouldBypassAssignedVersionSpoof(packageName)) {
                         restoreVersionFields(versionClass);
                     } else {
                         applyVersionFields(versionClass);
@@ -243,6 +252,10 @@ public class BuildHooks {
     }
 
     private static void applyOrRestoreVersionInt(Class<?> targetClass, String fieldName, String toggleFieldId, int value) {
+        if (fieldName.equals("SDK_INT") && RuntimeSdkScope.active()) {
+            setStaticInt(targetClass, fieldName, ACTUAL_SDK);
+            return;
+        }
         if (ConfigManager.isSpoofEnabled(toggleFieldId)) {
             setStaticInt(targetClass, fieldName, value);
         } else {

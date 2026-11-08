@@ -276,4 +276,7 @@
     <string-array name="xposed_scope">
         <item>com.spoofmydevice</item>
     </string-array>
+    <string name="settings_field_hardware_properties">Hardware properties (JSON)</string>
+    <string name="preset_search_hint">Search presets</string>
+    <string name="preset_search_empty">No matching presets.</string>
 </resources>

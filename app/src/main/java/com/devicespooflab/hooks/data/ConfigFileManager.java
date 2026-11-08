@@ -83,10 +83,17 @@ public class ConfigFileManager {
         DeviceProfile profile = mergeProfile(baseProfile, properties);
         profile.applyFallbacks();
 
+        Map<String, String> hardwareProperties = new LinkedHashMap<>(profile.getHardwareProperties());
+        for (Map.Entry<String, String> entry : properties.entrySet()) {
+            if (isHardwareProperty(entry.getKey())) hardwareProperties.put(entry.getKey(), entry.getValue());
+        }
+        profile.setHardwareProperties(hardwareProperties);
+
         Map<String, String> extraProperties = new LinkedHashMap<>(properties);
         for (String key : MANAGED_KEYS) {
             extraProperties.remove(key);
         }
+        extraProperties.keySet().removeIf(ConfigFileManager::isHardwareProperty);
 
         if (selectedPresetId == null || selectedPresetId.trim().isEmpty()) {
             selectedPresetId = findMatchingPresetId(profile, presets);
@@ -252,6 +259,9 @@ public class ConfigFileManager {
         append(builder, "vulkan.level", String.valueOf(profile.getVulkanLevel()));
         append(builder, "cpu.hardware", profile.getCpuHardware());
         append(builder, "cpu.cores", String.valueOf(profile.getCpuCores()));
+        for (Map.Entry<String, String> entry : profile.getHardwareProperties().entrySet()) {
+            if (isHardwareProperty(entry.getKey())) append(builder, entry.getKey(), entry.getValue());
+        }
         append(builder, "vendor.gpu.model", profile.getGpuRenderer());
         append(builder, "ro.opengles.version", "196610");
         append(builder, "ro.cpuvulkan.version", "4206592");
@@ -309,6 +319,12 @@ public class ConfigFileManager {
 
     public File getConfigFile(Context context) {
         return new File(context.getFilesDir(), CONFIG_NAME);
+    }
+
+    public static boolean isHardwareProperty(String key) {
+        return key != null && (key.startsWith("hardware.") || key.startsWith("kernel.")
+            || key.startsWith("sensor.") || key.startsWith("network.")
+            || (key.startsWith("cpu.") && !key.equals("cpu.cores") && !key.equals("cpu.hardware")));
     }
 
     private DeviceProfile mergeProfile(DeviceProfile baseProfile, Map<String, String> properties) {
@@ -421,15 +437,8 @@ public class ConfigFileManager {
     }
 
     private String graphicsStack(DeviceProfile profile) {
-        String manufacturer = nullable(profile.getManufacturer()).toLowerCase(Locale.US);
-        String platform = firstNonBlank(profile.getBoardPlatform(), profile.getHardware()).toLowerCase(Locale.US);
-        if (platform.contains("malibu") || platform.contains("cubs")) {
-            return "powervr";
-        }
-        if (manufacturer.contains("google") || platform.contains("gs") || platform.contains("tensor") || platform.contains("zuma")) {
-            return "mali";
-        }
-        return "adreno";
+        return com.devicespooflab.hooks.utils.HardwareIdentity.graphicsDriverFor(
+            profile.getGpuVendor(), profile.getGpuRenderer(), profile.getSocModel());
     }
 
     private static String nullable(String value) {
