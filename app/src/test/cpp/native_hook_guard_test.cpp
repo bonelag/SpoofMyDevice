@@ -5,7 +5,9 @@
 #include <mutex>
 #include <stdexcept>
 #include <thread>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 std::mutex registry;
 int original_reads = 0;
@@ -23,7 +25,9 @@ int traced_property_read() {
 }
 
 int main() {
+#ifndef _WIN32
     alarm(5);
+#endif
     assert(traced_property_read() == 42);
     assert(original_reads == 1 && identity_reads == 1);
     {
@@ -44,6 +48,8 @@ int main() {
     try { smd::NativeHookGuard call; throw std::runtime_error("callback failure"); }
     catch (const std::runtime_error &) { }
     { smd::NativeHookGuard recovered; assert(recovered.primary()); }
+#ifndef _WIN32
     alarm(0);
+#endif
     std::puts("PASS: tracing reentry, callback nesting, thread isolation, exception recovery");
 }

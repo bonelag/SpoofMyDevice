@@ -10,4 +10,5 @@ if(ANDROID_ABI STREQUAL "arm64-v8a" OR ANDROID_ABI STREQUAL "armeabi-v7a")
 else()
     add_library(smdidentity SHARED unsupported.cpp)
 endif()
-target_compile_options(smdidentity PRIVATE -Wall -Wextra -fvisibility=hidden)
+# Published APKs use the debug variant too; libc proxies must retain optimization.
+target_compile_options(smdidentity PRIVATE -O2 -Wall -Wextra -fvisibility=hidden)

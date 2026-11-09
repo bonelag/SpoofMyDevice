@@ -77,12 +77,13 @@ Key runtime properties:
 - `MainHook` is registered through `app/src/main/assets/xposed_init`.
 - Profile state is persisted in the companion app's `app_profiles.json` file.
 - Hook callbacks read in-memory profile data; configuration transport and virtual-file preparation run on the worker.
+- File redirects use prepared indexes and compact inventory mappings. Completed, versioned virtual-file caches are reused across app processes; missing cache entries are restored with atomic file replacement. Ordinary native app/font/database paths bypass identity lookup work.
 - A temporary transport failure preserves the last valid snapshot.
 - A valid unassignment clears the active profile and restores captured `Build` values.
 - Config reload requests are coalesced on a background worker.
 - A validated primary application can prepare a direct-file startup cache before creation with a 100 ms wait limit. Full configuration transport starts on the worker after `Application.attach`; package class-loader callbacks do not start transport.
 - Companion activation checks use the same primary-application, protected-process, and boot checks as target hooks.
-- Active SDK properties are capped at the physical OS API while saved profiles retain their requested values. WebView/Chromium API selection temporarily uses the real SDK.
+- Active SDK properties are capped at the physical OS API while saved profiles retain their requested values. WebView/Chromium runtime guards are installed when the effective SDK differs from the OS SDK. Matching initial SDKs avoid global dispatch/class-loading hooks; installed guards return immediately when later settings match. User-agent callbacks are registered once per WebSettings implementation.
 - Native hooks guard against tracing reentry and preserve bionic property handles and callback serials.
 
 ## Profile Resolution
@@ -248,12 +249,13 @@ The GitHub Actions workflow is manual and publishes a debug-signed APK. It reads
 
 | Check | Last recorded result |
 | --- | --- |
-| JVM unit tests | 67 passed across 16 suites; 0 failures/errors/skips |
+| JVM unit tests | 80 passed across 17 suites; 0 failures/errors/skips |
 | Preset catalog/config/identity validation | 43 passed on the host JVM; original nine preset hashes preserved |
 | Current `compileDebugKotlin` | Passed |
 | Current `assembleDebug` | Passed |
-| Current `lintDebug` | Passed with 0 errors and 122 warnings |
+| Current `lintDebug` | Passed with 0 errors and 121 warnings |
 | Native packaging | ARM64/ARMv7 hooks and x86/x86_64 fallback stubs built successfully |
+| Native host regressions | Path semantics/allocation fast paths and tracing reentry/callback/thread/exception guard checks passed |
 | KernelSU soft reboot on V2507A | Earlier boot-safe APK: 3 passed with API 35/36/37 profiles; combined 2.0.6 repairs need renewed device validation |
 
 ## Repository Layout

@@ -439,6 +439,7 @@ public class MainHook implements IXposedHookLoadPackage {
                 }
                 String processName = lpparam.processName == null ? lpparam.packageName : lpparam.processName;
                 if (INITIALIZED_HOOK_PROCESSES.contains(processName)) {
+                    WebViewHooks.refreshRuntimeSdkGuard(lpparam);
                     // Also restore original Build fields when a profile is removed.
                     BuildHooks.reapply(lpparam.classLoader, lpparam.packageName);
                 }

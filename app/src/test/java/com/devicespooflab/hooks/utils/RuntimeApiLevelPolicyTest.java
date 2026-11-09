@@ -30,4 +30,30 @@ public class RuntimeApiLevelPolicyTest {
         assertEquals("35", RuntimeApiLevelPolicy.limit(java.util.Collections.singletonMap("ro.build.version.sdk", "invalid"), 35)
             .get("ro.build.version.sdk"));
     }
+
+    @Test public void cappedAndMatchingSdksDoNotNeedGlobalRuntimeDispatchHooks() {
+        Map<String, String> effective = RuntimeApiLevelPolicy.limit(java.util.Collections.singletonMap("ro.build.version.sdk", "37"), 35);
+        assertFalse(RuntimeApiLevelPolicy.needsRuntimeSdkScope(Integer.parseInt(effective.get("ro.build.version.sdk")), 35));
+        assertFalse(RuntimeApiLevelPolicy.needsRuntimeSdkScope(35, 35));
+        assertFalse(RuntimeApiLevelPolicy.needsRuntimeSdkScope(0, 35));
+    }
+
+    @Test public void matchingSdkAvoidsWritesButLowerSdkStillProtectsRuntimeSelection() {
+        java.util.concurrent.atomic.AtomicInteger sdk = new java.util.concurrent.atomic.AtomicInteger(35);
+        java.util.concurrent.atomic.AtomicInteger writes = new java.util.concurrent.atomic.AtomicInteger();
+        RuntimeSdkScope scope = new RuntimeSdkScope(35, sdk::get, value -> { writes.incrementAndGet(); sdk.set(value); }, enabled -> {});
+        if (RuntimeApiLevelPolicy.needsRuntimeSdkScope(sdk.get(), 35)) {
+            try (RuntimeSdkScope.Lease ignored = scope.enter()) { fail("Matching SDK must not open a runtime scope"); }
+        }
+        assertEquals(0, writes.get());
+        assertFalse(RuntimeSdkScope.active());
+        sdk.set(33);
+        assertTrue(RuntimeApiLevelPolicy.needsRuntimeSdkScope(sdk.get(), 35));
+        try (RuntimeSdkScope.Lease ignored = scope.enter()) {
+            assertEquals(35, sdk.get());
+            assertTrue(RuntimeSdkScope.active());
+        }
+        assertEquals(33, sdk.get());
+        assertFalse(RuntimeSdkScope.active());
+    }
 }

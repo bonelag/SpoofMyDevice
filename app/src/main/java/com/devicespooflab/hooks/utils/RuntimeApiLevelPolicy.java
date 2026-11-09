@@ -7,6 +7,11 @@ import java.util.Map;
 public final class RuntimeApiLevelPolicy {
     private RuntimeApiLevelPolicy() { }
 
+    /** Call with the effective SDK, after limit(); equal SDKs need no runtime hooks. */
+    public static boolean needsRuntimeSdkScope(int reportedSdk, int actualSdk) {
+        return reportedSdk > 0 && reportedSdk != actualSdk;
+    }
+
     public static Map<String, String> limit(Map<String, String> configured, int actualSdk) {
         Map<String, String> result = new LinkedHashMap<>(configured);
         for (Map.Entry<String, String> entry : result.entrySet()) {

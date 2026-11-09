@@ -16,27 +16,36 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
- * Hooks WebView User-Agent to match Pixel 7 Pro device profile.
- *
- * Non-aggressive implementation - only spoofs User-Agent string, no Canvas/WebGL.
- * User requested: "spoof the headers such as user agent, device model, dimensions"
+ * Applies the active profile's User-Agent. Runtime API guards are installed only
+ * when its effective SDK differs from the OS, so normal UI dispatch stays unhooked.
  */
 public class WebViewHooks {
 
     private static final String TAG = "DeviceSpoofLab-WebView";
     private static final Set<Class<?>> SDK_RUNTIME_CLASSES = ConcurrentHashMap.newKeySet();
     private static final Set<ClassLoader> SDK_RUNTIME_LOADERS = ConcurrentHashMap.newKeySet();
+    private static final Set<Class<?>> USER_AGENT_CLASSES = ConcurrentHashMap.newKeySet();
+    private static boolean runtimeSdkHooksInstalled;
+    private static volatile boolean runtimeSdkGuardNeeded;
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            hookRuntimeSdkReaders();
-            hookRuntimeDispatch(lpparam.classLoader);
+            refreshRuntimeSdkGuard(lpparam);
             hookWebSettings(lpparam);
             hookDefaultUserAgent(lpparam);
             hookWebViewConstructor(lpparam);
         } catch (Exception e) {
             XposedBridge.log(TAG + ": Failed to hook WebView: " + e.getMessage());
         }
+    }
+
+    /** Invoked on the main thread before initial or reloaded Build fields are applied. */
+    public static void refreshRuntimeSdkGuard(XC_LoadPackage.LoadPackageParam lpparam) {
+        runtimeSdkGuardNeeded = BuildHooks.requiresRuntimeSdkGuard(lpparam.packageName);
+        if (!runtimeSdkGuardNeeded || runtimeSdkHooksInstalled) return;
+        hookRuntimeSdkReaders();
+        hookRuntimeDispatch(lpparam.classLoader);
+        runtimeSdkHooksInstalled = true;
     }
 
     private static boolean runtimeInfoClass(String name) {
@@ -46,7 +55,7 @@ public class WebViewHooks {
     private static XC_MethodHook runtimeSdkHook() {
         return new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam param) {
-                param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
+                if (runtimeSdkGuardNeeded) param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
             }
             @Override protected void afterHookedMethod(MethodHookParam param) {
                 Object lease = param.getObjectExtra("smd.runtimeSdk");
@@ -89,9 +98,10 @@ public class WebViewHooks {
         if (settings != null) XposedBridge.hookAllMethods(settings, "getDefaultUserAgent", runtimeSdkHook());
         XposedHelpers.findAndHookMethod(Handler.class, "dispatchMessage", Message.class, new XC_MethodHook() {
             @Override protected void beforeHookedMethod(MethodHookParam param) {
+                if (!runtimeSdkGuardNeeded) return;
                 Message message = (Message) param.args[0];
-                Object handlerCallback = XposedHelpers.getObjectField(param.thisObject, "mCallback");
-                if (webViewRuntime(message.getCallback()) || webViewRuntime(param.thisObject) || webViewRuntime(handlerCallback)) {
+                if (webViewRuntime(message.getCallback()) || webViewRuntime(param.thisObject)
+                    || webViewRuntime(XposedHelpers.getObjectField(param.thisObject, "mCallback"))) {
                     param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
                 }
             }
@@ -108,7 +118,9 @@ public class WebViewHooks {
             if (!method.getName().equals("loadClass") || types.length == 0 || types[0] != String.class) continue;
             XposedBridge.hookMethod(method, new XC_MethodHook() {
                 @Override protected void beforeHookedMethod(MethodHookParam param) {
-                    if (runtimeInfoClass((String) param.args[0])) param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
+                    if (runtimeSdkGuardNeeded && runtimeInfoClass((String) param.args[0])) {
+                        param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
+                    }
                 }
                 @Override protected void afterHookedMethod(MethodHookParam param) {
                     Object lease = param.getObjectExtra("smd.runtimeSdk");
@@ -177,6 +189,9 @@ public class WebViewHooks {
                                 }
                             }
 
+                            // getSettings() can run repeatedly; one callback per implementation
+                            // prevents growing Xposed chains throughout the app's lifetime.
+                            if (!USER_AGENT_CLASSES.add(settingsClass)) return;
                             try {
                                 XposedHelpers.findAndHookMethod(settingsClass, "getUserAgentString",
                                     new XC_MethodHook() {
@@ -189,6 +204,7 @@ public class WebViewHooks {
                                         }
                                     });
                             } catch (Throwable ignored) {
+                                USER_AGENT_CLASSES.remove(settingsClass);
                             }
                         }
                     }

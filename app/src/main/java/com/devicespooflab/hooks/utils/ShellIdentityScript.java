@@ -22,11 +22,9 @@ public final class ShellIdentityScript {
             properties.put(key, entry.getValue() == null ? "" : entry.getValue());
         }
         StringBuilder script = new StringBuilder(RESET);
-        script.append("getprop() {\nif [ \"$#\" -eq 0 ]; then\ncommand /system/bin/getprop | {\n__smd_seen='|'\nwhile IFS= read -r __smd_line; do\ncase \"$__smd_line\" in\n");
+        script.append("getprop() {\nif [ \"$#\" -eq 0 ]; then\ncommand /system/bin/getprop | {\nwhile IFS= read -r __smd_line; do\ncase \"$__smd_line\" in\n");
         for (Map.Entry<String, String> entry : properties.entrySet()) {
-            script.append(quote("[" + entry.getKey() + "]: [")).append("*) printf '%s\\n' ")
-                .append(quote("[" + entry.getKey() + "]: [" + entry.getValue() + "]"))
-                .append("; __smd_seen=\"$__smd_seen").append(entry.getKey()).append("|\";;\n");
+            script.append(quote("[" + entry.getKey() + "]: [")).append("*) :;;\n");
         }
         boolean nonVivo = !input.getOrDefault("ro.product.brand", "").matches("(?i).*(vivo|iqoo).*");
         String soc = input.getOrDefault("ro.soc.manufacturer", "") + " " + input.getOrDefault("ro.soc.model", "");
@@ -34,20 +32,22 @@ public final class ShellIdentityScript {
             && !"false".equalsIgnoreCase(input.get("spoof.enabled.soc_model")) && !"0".equals(input.get("spoof.enabled.soc_model"));
         if (nonVivo) script.append("'[ro.vivo.'*|'[ro.vendor.vivo.'*|'[persist.vivo.'*|'[vendor.gsm.project.'*) :;;\n");
         if (nonMediatek) script.append("'[ro.mediatek.'*|'[ro.vendor.mediatek.'*|'[ro.vendor.mtk_'*|'[ro.mtk.'*) :;;\n");
-        script.append("*) printf '%s\\n' \"$__smd_line\";;\nesac\ndone\n");
-        for (Map.Entry<String, String> entry : properties.entrySet()) {
-            script.append("case \"$__smd_seen\" in *").append(quote("|" + entry.getKey() + "|"))
-                .append("*) :;; *) printf '%s\\n' ")
-                .append(quote("[" + entry.getKey() + "]: [" + entry.getValue() + "]")).append(";; esac\n");
+        script.append("*) printf '%s\\n' \"$__smd_line\";;\nesac\ndone\n}\n");
+        if (!properties.isEmpty()) {
+            script.append("printf '%s\\n'");
+            for (Map.Entry<String, String> entry : properties.entrySet()) {
+                script.append(" ").append(quote("[" + entry.getKey() + "]: [" + entry.getValue() + "]"));
+            }
+            script.append('\n');
         }
-        script.append("}\nelse\ncase \"$1\" in\n");
+        script.append("else\ncase \"$1\" in\n");
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             script.append(quote(entry.getKey())).append(") printf '%s\\n' ").append(quote(entry.getValue())).append(";;\n");
         }
         if (nonVivo) script.append("ro.vivo.*|ro.vendor.vivo.*|persist.vivo.*|vendor.gsm.project.*) printf '\\n';;\n");
         if (nonMediatek) script.append("ro.mediatek.*|ro.vendor.mediatek.*|ro.vendor.mtk_*|ro.mtk.*) printf '\\n';;\n");
         script.append("*) command /system/bin/getprop \"$@\";;\nesac\nfi\n}\n");
-        List<Map.Entry<String, String>> entries = new ArrayList<>(paths.entrySet());
+        List<Map.Entry<String, String>> entries = new ArrayList<>(IdentityPaths.compact(paths).entrySet());
         entries.sort(Comparator.comparingInt((Map.Entry<String, String> entry) -> entry.getKey().length()).reversed());
         script.append("__smd_path() {\n__smd_path_result=\"$1\"\ncase \"$1\" in -*|'') return;; /*) __smd_input=\"$1\";; *) __smd_input=\"$PWD/$1\";; esac\n")
             .append("__smd_saved_ifs=\"$IFS\"\n__smd_saved_f=0\ncase \"$-\" in *f*) __smd_saved_f=1;; esac\n")

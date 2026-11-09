@@ -3,6 +3,7 @@ package com.devicespooflab.hooks.hooks;
 import com.devicespooflab.hooks.utils.ConfigManager;
 import com.devicespooflab.hooks.utils.RuntimeSdkScope;
 import com.devicespooflab.hooks.utils.NativeIdentity;
+import com.devicespooflab.hooks.utils.RuntimeApiLevelPolicy;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -33,6 +34,12 @@ public class BuildHooks {
         NativeIdentity::bypassRuntimeVersion);
 
     public static RuntimeSdkScope.Lease useRuntimeSdk() { return RUNTIME_SDK.enter(); }
+
+    public static boolean requiresRuntimeSdkGuard(String packageName) {
+        return ConfigManager.isSpoofEnabled(ConfigManager.FIELD_SDK)
+            && !ConfigManager.shouldBypassAssignedVersionSpoof(packageName)
+            && RuntimeApiLevelPolicy.needsRuntimeSdkScope(ConfigManager.getBuildVersionSdk(), ACTUAL_SDK);
+    }
 
     public static void hook(XC_LoadPackage.LoadPackageParam lpparam) {
         reapply(lpparam.classLoader, lpparam.packageName);

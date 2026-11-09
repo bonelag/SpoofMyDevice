@@ -33,6 +33,7 @@ public class ShellIdentityScriptTest {
         p.put("init.svc.bootanim", "running");
         String output = execute(ShellIdentityScript.build(p, Collections.emptyMap()), "getprop\ngetprop ro.product.model\n");
         assertTrue(output.contains("[ro.product.model]: [Pixel ' $(touch sentinel)]"));
+        assertEquals(1, output.split("\\[ro.product.model\\]:", -1).length - 1);
         assertEquals(1, output.split("\\[ro.product.nickname\\]:", -1).length - 1);
         assertTrue(output.contains("[sys.boot_completed]: [1]"));
         assertTrue(output.contains("[init.svc.bootanim]: [stopped]"));
@@ -78,6 +79,39 @@ public class ShellIdentityScriptTest {
         String output = execute(first, "uname -rm\n. " + ShellIdentityScript.quote(posix(inactive)) + "\n"
             + "if [ \"$(command -v uname)\" = uname ]; then echo STALE; else echo CLEARED; fi\n");
         assertEquals("6.6-configured aarch64\nCLEARED\n", output);
+    }
+
+    @Test public void largeCpuInventoryKeepsACompactScriptAndShellResponseMarkers() throws Exception {
+        File cpu = temporary.newFolder("cpu");
+        File frequency = new File(cpu, "cpu0/cpufreq/scaling_cur_freq");
+        assertTrue(frequency.getParentFile().mkdirs());
+        Files.write(frequency.toPath(), "2250000\n".getBytes(StandardCharsets.UTF_8));
+        File exception = temporary.newFile("exception");
+        Files.write(exception.toPath(), "3780000\n".getBytes(StandardCharsets.UTF_8));
+        Map<String, String> paths = new LinkedHashMap<>();
+        String root = "/sys/devices/system/cpu";
+        paths.put(root, posix(cpu));
+        for (int index = 0; index < 256; index++) {
+            paths.put(root + "/cpu" + index, posix(cpu) + "/cpu" + index);
+            paths.put(root + "/cpu" + index + "/cpufreq/scaling_cur_freq", posix(cpu) + "/cpu" + index + "/cpufreq/scaling_cur_freq");
+        }
+        paths.put(root + "/cpu0/cpufreq/cpuinfo_max_freq", posix(exception));
+        String script = ShellIdentityScript.build(properties(), paths);
+        assertTrue("Inventory-owned children must not expand the shell program", script.length() < 12000);
+        assertEquals("2250000\n3780000\n/shellCallback/\n", execute(script,
+            "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq\n"
+            + "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq\necho /shellCallback/\n"));
+    }
+
+    @Test public void dumpFiltersDuplicatePhysicalAliasesThenEmitsEachConfiguredValueOnce() throws Exception {
+        String commands = "__fixture_getprop() { printf '%s\\n' '[ro.product.model]: [physical1]' '[ro.product.model]: [physical2]' '[unrelated.key]: [original]' '[sys.boot_completed]: [1]'; }\ngetprop\n";
+        String output = execute(ShellIdentityScript.build(properties(), Collections.emptyMap()), commands);
+        assertEquals(1, output.split("\\[ro.product.model\\]:", -1).length - 1);
+        assertTrue(output.contains("[ro.product.model]: [Pixel 10 Pro]"));
+        assertTrue(output.contains("[unrelated.key]: [original]"));
+        assertTrue(output.contains("[sys.boot_completed]: [1]"));
+        assertFalse(output.contains("physical1"));
+        assertFalse(output.contains("physical2"));
     }
 
     private Map<String, String> properties() {

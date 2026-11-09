@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "native_hook_guard.h"
+#include "identity_paths.h"
 #include <shadowhook.h>
 #include <android/sensor.h>
 #include <sys/system_properties.h>
@@ -27,8 +28,9 @@
 
 namespace {
 struct State {
-    std::map<std::string, std::string> properties;
-    std::map<std::string, std::string> paths;
+    smd::IdentityPathMap properties;
+    smd::IdentityPathMap paths;
+    smd::IdentityPathMap reverse_paths;
 };
 std::shared_ptr<const State> current = std::make_shared<const State>();
 const std::shared_ptr<const State> inactive = std::make_shared<const State>();
@@ -107,7 +109,7 @@ bool runtime_property(const std::string &key) {
     return begins(key, "init.svc.") || begins(key, "sys.boot") || key == "dev.bootcomplete"
         || key == "service.bootanim.exit" || key == "sys.shutdown.requested" || key == "sys.powerctl";
 }
-const std::string *get(const State &snapshot, const std::string &key) {
+const std::string *get(const State &snapshot, std::string_view key) {
     auto item = snapshot.properties.find(key);
     return item == snapshot.properties.end() ? nullptr : &item->second;
 }
@@ -174,21 +176,6 @@ const char *permanent(const std::string &text) {
     if (found == permanent_strings.end()) found = permanent_strings.emplace(text, std::make_unique<std::string>(text)).first;
     return found->second->c_str();
 }
-std::string normalize(const std::string &path) {
-    std::vector<std::string> parts;
-    size_t begin = 0;
-    while (begin < path.size()) {
-        size_t slash = path.find('/', begin);
-        std::string part = path.substr(begin, slash == std::string::npos ? std::string::npos : slash - begin);
-        if (part == "..") { if (!parts.empty()) parts.pop_back(); }
-        else if (!part.empty() && part != ".") parts.push_back(part);
-        if (slash == std::string::npos) break;
-        begin = slash + 1;
-    }
-    std::string result;
-    for (const auto &part : parts) result += "/" + part;
-    return result.empty() ? "/" : result;
-}
 std::string logical_path(const State &snapshot, const char *path, int directory = AT_FDCWD) {
     if (path == nullptr) return {};
     std::string actual(path);
@@ -206,28 +193,15 @@ std::string logical_path(const State &snapshot, const char *path, int directory 
         }
         actual = std::string(base) + "/" + actual;
     }
-    actual = normalize(actual);
+    if (!smd::normalized_identity_path(actual)) actual = smd::normalize_identity_path(actual);
     // openat on an already virtualized directory still uses its original logical path.
-    const std::pair<const std::string, std::string> *best = nullptr;
-    for (const auto &item : snapshot.paths) if (actual == item.second || begins(actual, (item.second + "/").c_str())) {
-        if (best == nullptr || item.second.size() > best->second.size()) best = &item;
-    }
-    if (best != nullptr) return best->first + actual.substr(best->second.size());
-    return actual;
+    return smd::restore_identity_path(snapshot.reverse_paths, actual);
 }
-std::string redirect(const State &snapshot, const char *path, int directory = AT_FDCWD) {
-    if (!eligible() || snapshot.paths.empty()) return {};
-    std::string logical = logical_path(snapshot, path, directory);
-    auto found = snapshot.paths.find(logical);
-    if (found != snapshot.paths.end()) return found->second;
-    const std::pair<const std::string, std::string> *best = nullptr;
-    for (const auto &item : snapshot.paths) {
-        if ((!begins(item.first, "/proc/") || begins(item.first, "/proc/device-tree"))
-            && begins(logical, (item.first + "/").c_str())) {
-            if (best == nullptr || item.first.size() > best->first.size()) best = &item;
-        }
-    }
-    return best == nullptr ? std::string() : best->second + logical.substr(best->first.size());
+std::string redirect(const char *path, int directory = AT_FDCWD) {
+    if (!smd::may_redirect_identity_path(path) || !eligible()) return {};
+    auto snapshot = state();
+    if (snapshot->paths.empty()) return {};
+    return smd::redirect_identity_path(snapshot->paths, logical_path(*snapshot, path, directory));
 }
 bool read_only(int flags) { return (flags & O_ACCMODE) == O_RDONLY && (flags & (O_CREAT | O_TRUNC)) == 0 && (flags & O_TMPFILE) != O_TMPFILE; }
 
@@ -249,11 +223,12 @@ struct Callback {
     void (*callback)(void *, const char *, const char *, uint32_t);
     void *cookie;
     std::shared_ptr<const State> snapshot;
-    bool application;
+    void *caller;
 };
 void property_callback(void *cookie, const char *name, const char *value, uint32_t serial) {
     auto *context = static_cast<Callback *>(cookie);
-    const auto *replacement = name != nullptr && (!sensitive_driver_key(name) || context->application)
+    const auto *replacement = name != nullptr && (!sensitive_driver_key(name)
+        || application_caller(*context->snapshot, context->caller))
         ? property(*context->snapshot, name) : nullptr;
     smd::NativeHookGuard::ClientCallback client;
     // The serial belongs to bionic's actual prop_info buffer and seqlock protocol.
@@ -266,7 +241,7 @@ void proxy_property_read_callback(const prop_info *info, void (*callback)(void *
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_property_read_callback, info, callback, cookie);
     if (!eligible() || callback == nullptr) { SHADOWHOOK_CALL_PREV(proxy_property_read_callback, info, callback, cookie); return; }
     auto snapshot = state();
-    Callback context{callback, cookie, snapshot, application_caller(*snapshot, SHADOWHOOK_RETURN_ADDRESS())};
+    Callback context{callback, cookie, snapshot, SHADOWHOOK_RETURN_ADDRESS()};
     SHADOWHOOK_CALL_PREV(proxy_property_read_callback, info, property_callback, &context);
 }
 void capture_property_name(void *cookie, const char *name, const char *, uint32_t) {
@@ -300,8 +275,7 @@ int proxy_open(const char *path, int flags, ...) {
     mode_t mode = 0;
     if ((flags & O_CREAT) != 0 || (flags & O_TMPFILE) == O_TMPFILE) { va_list arguments; va_start(arguments, flags); mode = va_arg(arguments, int); va_end(arguments); }
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_open, path, flags, mode);
-    auto snapshot = state();
-    std::string target = read_only(flags) ? redirect(*snapshot, path) : std::string();
+    std::string target = read_only(flags) ? redirect(path) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_open, target.empty() ? path : target.c_str(), flags, mode);
 }
 int proxy_openat(int directory, const char *path, int flags, ...) {
@@ -310,102 +284,98 @@ int proxy_openat(int directory, const char *path, int flags, ...) {
     mode_t mode = 0;
     if ((flags & O_CREAT) != 0 || (flags & O_TMPFILE) == O_TMPFILE) { va_list arguments; va_start(arguments, flags); mode = va_arg(arguments, int); va_end(arguments); }
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_openat, directory, path, flags, mode);
-    auto snapshot = state();
-    std::string target = read_only(flags) ? redirect(*snapshot, path, directory) : std::string();
+    std::string target = read_only(flags) ? redirect(path, directory) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_openat, target.empty() ? directory : AT_FDCWD, target.empty() ? path : target.c_str(), flags, mode);
 }
 int proxy_open_2(const char *path, int flags) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_open_2, path, flags);
-    auto snapshot = state();
-    std::string target = read_only(flags) ? redirect(*snapshot, path) : std::string();
+    std::string target = read_only(flags) ? redirect(path) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_open_2, target.empty() ? path : target.c_str(), flags);
 }
 int proxy_openat_2(int directory, const char *path, int flags) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_openat_2, directory, path, flags);
-    auto snapshot = state();
-    std::string target = read_only(flags) ? redirect(*snapshot, path, directory) : std::string();
+    std::string target = read_only(flags) ? redirect(path, directory) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_openat_2, target.empty() ? directory : AT_FDCWD, target.empty() ? path : target.c_str(), flags);
 }
 FILE *proxy_fopen(const char *path, const char *mode) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_fopen, path, mode);
-    auto snapshot = state();
-    std::string target = mode != nullptr && mode[0] == 'r' && std::strchr(mode, '+') == nullptr ? redirect(*snapshot, path) : std::string();
+    std::string target = mode != nullptr && mode[0] == 'r' && std::strchr(mode, '+') == nullptr ? redirect(path) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_fopen, target.empty() ? path : target.c_str(), mode);
 }
 int proxy_stat(const char *path, struct stat *data) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_stat, path, data);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_stat, target.empty() ? path : target.c_str(), data);
 }
 int proxy_lstat(const char *path, struct stat *data) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_lstat, path, data);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_lstat, target.empty() ? path : target.c_str(), data);
 }
 int proxy_stat64(const char *path, struct stat64 *data) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_stat64, path, data);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_stat64, target.empty() ? path : target.c_str(), data);
 }
 int proxy_lstat64(const char *path, struct stat64 *data) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_lstat64, path, data);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_lstat64, target.empty() ? path : target.c_str(), data);
 }
 int proxy_fstatat(int directory, const char *path, struct stat *data, int flags) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_fstatat, directory, path, data, flags);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path, directory);
+    std::string target = redirect(path, directory);
     return SHADOWHOOK_CALL_PREV(proxy_fstatat, target.empty() ? directory : AT_FDCWD, target.empty() ? path : target.c_str(), data, flags);
 }
 int proxy_fstatat64(int directory, const char *path, struct stat64 *data, int flags) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_fstatat64, directory, path, data, flags);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path, directory);
+    std::string target = redirect(path, directory);
     return SHADOWHOOK_CALL_PREV(proxy_fstatat64, target.empty() ? directory : AT_FDCWD, target.empty() ? path : target.c_str(), data, flags);
 }
 ssize_t proxy_readlink(const char *path, char *output, size_t size) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_readlink, path, output, size);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_readlink, target.empty() ? path : target.c_str(), output, size);
 }
 ssize_t proxy_readlinkat(int directory, const char *path, char *output, size_t size) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_readlinkat, directory, path, output, size);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path, directory);
+    std::string target = redirect(path, directory);
     return SHADOWHOOK_CALL_PREV(proxy_readlinkat, target.empty() ? directory : AT_FDCWD, target.empty() ? path : target.c_str(), output, size);
 }
 int proxy_access(const char *path, int mode) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_access, path, mode);
-    auto snapshot = state(); std::string target = (mode & W_OK) == 0 ? redirect(*snapshot, path) : std::string();
+    std::string target = (mode & W_OK) == 0 ? redirect(path) : std::string();
     return SHADOWHOOK_CALL_PREV(proxy_access, target.empty() ? path : target.c_str(), mode);
 }
 DIR *proxy_opendir(const char *path) {
     smd::NativeHookGuard call;
     SHADOWHOOK_STACK_SCOPE();
     if (!call.primary()) return SHADOWHOOK_CALL_PREV(proxy_opendir, path);
-    auto snapshot = state(); std::string target = redirect(*snapshot, path);
+    std::string target = redirect(path);
     return SHADOWHOOK_CALL_PREV(proxy_opendir, target.empty() ? path : target.c_str());
 }
 void copy(char *target, size_t size, const std::string *value) {
@@ -499,7 +469,7 @@ void *hook(const char *library, const char *name, void *replacement, void **orig
     if (result != nullptr && address != nullptr) hooked_addresses.insert(address);
     return result;
 }
-void map(JNIEnv *environment, jobjectArray keys, jobjectArray values, std::map<std::string, std::string> &target) {
+void map(JNIEnv *environment, jobjectArray keys, jobjectArray values, smd::IdentityPathMap &target) {
     if (keys == nullptr || values == nullptr) return;
     jsize count = std::min(environment->GetArrayLength(keys), environment->GetArrayLength(values));
     for (jsize index = 0; index < count; index++) {
@@ -568,6 +538,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_devicespooflab_hooks_utils_NativeIden
     auto snapshot = std::make_shared<State>();
     map(environment, keys, values, snapshot->properties);
     map(environment, paths, targets, snapshot->paths);
+    snapshot->reverse_paths = smd::reverse_identity_paths(snapshot->paths);
     // Enumerate on the configuration worker, never while a linker callback is running.
     dl_iterate_phdr(code_ranges, snapshot.get());
     std::shared_ptr<const State> immutable = snapshot;
