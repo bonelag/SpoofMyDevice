@@ -83,8 +83,9 @@ Key runtime properties:
 - Config reload requests are coalesced on a background worker.
 - A validated primary application can prepare a direct-file startup cache before creation with a 100 ms wait limit. Full configuration transport starts on the worker after `Application.attach`; package class-loader callbacks do not start transport.
 - Companion activation checks use the same primary-application, protected-process, and boot checks as target hooks.
-- Active SDK properties are capped at the physical OS API while saved profiles retain their requested values. WebView/Chromium runtime guards are installed when the effective SDK differs from the OS SDK. Matching initial SDKs avoid global dispatch/class-loading hooks; installed guards return immediately when later settings match. User-agent callbacks are registered once per WebSettings implementation.
+- Active SDK properties are capped at the physical OS API while saved profiles retain their requested values. WebView/Chromium and supported native-library initializer guards use the physical SDK when the effective SDK differs from the OS SDK. Matching initial SDKs avoid global dispatch/class-loading hooks; installed guards return immediately when later settings match. User-agent callbacks are registered once per WebSettings implementation.
 - Native hooks guard against tracing reentry and preserve bionic property handles and callback serials.
+- Applications containing their own ShadowHook runtime use Java/shell compatibility: SpoofMyDevice skips its direct native backend to avoid two engines patching the same linker. Profiles and Java/shell hooks remain active; raw native reads can retain physical values. See [Shopee startup repair](docs/shopee-startup-fix-2026-11-14.md).
 
 ## Profile Resolution
 
@@ -249,7 +250,7 @@ The GitHub Actions workflow is manual and publishes a debug-signed APK. It reads
 
 | Check | Last recorded result |
 | --- | --- |
-| JVM unit tests | 80 passed across 17 suites; 0 failures/errors/skips |
+| JVM unit tests | 87 passed across 19 suites; 0 failures/errors/skips |
 | Preset catalog/config/identity validation | 43 passed on the host JVM; original nine preset hashes preserved |
 | Current `compileDebugKotlin` | Passed |
 | Current `assembleDebug` | Passed |
@@ -278,6 +279,7 @@ presets/        Community-maintained JSON device profiles
 
 - Device identity is not changed globally; only supported APIs inside eligible scoped processes are affected.
 - Unsupported native/raw-syscall paths, hardware-backed attestation, Play Integrity, and server-side risk systems can still reveal the real environment. Native hooks support ARM64/ARMv7; other packaged ABIs use Java fallback.
+- Targets with a host-owned ShadowHook runtime use Java/shell compatibility and do not receive direct native identity hooks.
 - Default component and kernel metadata are synthetic profile values. Exact factory component identities require verified metadata.
 - Applications may cache identifiers before asynchronous profile loading completes.
 - Processes started during boot need a restart after boot readiness.

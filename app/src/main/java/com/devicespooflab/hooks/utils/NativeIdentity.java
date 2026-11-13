@@ -10,10 +10,14 @@ public final class NativeIdentity {
     private static volatile boolean attempted;
     private NativeIdentity() { }
 
-    public static synchronized void install() {
+    public static synchronized void install(ClassLoader hostLoader) {
         if (attempted) return;
         attempted = true;
         try {
+            if (NativeRuntimeConflictPolicy.hasHostShadowHook(hostLoader, NativeIdentity.class.getClassLoader())) {
+                XposedBridge.log("SpoofMyDevice: Host ShadowHook detected; using Java and shell identity compatibility");
+                return;
+            }
             int error = ShadowHook.init(new ShadowHook.ConfigBuilder().setMode(ShadowHook.Mode.SHARED).build());
             if (error != 0) throw new IllegalStateException("ShadowHook init: " + error);
             System.loadLibrary("smdidentity");

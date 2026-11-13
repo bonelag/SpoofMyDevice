@@ -6,6 +6,25 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 
 public class RuntimeSdkScopeTest {
+    @Test public void nativeInitializerCachesPhysicalApiWithoutChangingLowerAppSdk() {
+        AtomicInteger appSdk = new AtomicInteger(34);
+        AtomicInteger cachedNativeApi = new AtomicInteger(-1);
+        AtomicBoolean nativeBypass = new AtomicBoolean();
+        RuntimeSdkScope scope = new RuntimeSdkScope(35, appSdk::get, appSdk::set, nativeBypass::set);
+        try (RuntimeSdkScope.Lease wrapper = scope.enter()) {
+            try (RuntimeSdkScope.Lease nativeInit = scope.enter()) {
+                // NDK's pre-29 inline API discovery reads the property through native hooks.
+                cachedNativeApi.set(nativeBypass.get() ? 35 : appSdk.get());
+                assertEquals(35, appSdk.get());
+            }
+            assertTrue(nativeBypass.get());
+        }
+        assertEquals(35, cachedNativeApi.get());
+        assertEquals(34, appSdk.get());
+        assertFalse(nativeBypass.get());
+        assertFalse(RuntimeSdkScope.active());
+    }
+
     @Test public void runtimeUsesActualSdkAndAppValueReturnsAfterNestedCalls() {
         AtomicInteger sdk = new AtomicInteger(36);
         AtomicBoolean nativeBypass = new AtomicBoolean();

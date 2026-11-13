@@ -135,7 +135,7 @@ public class MainHook implements IXposedHookLoadPackage {
         // Capture real fields before SystemProperties hooks can affect Build initialization.
         BuildHooks.captureOriginals(lpparam.classLoader);
 
-        NativeIdentity.install();
+        NativeIdentity.install(lpparam.classLoader);
         IdentitySurfaceHooks.hook(lpparam);
 
         try {

@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Message;
 
 import com.devicespooflab.hooks.utils.ConfigManager;
+import com.devicespooflab.hooks.utils.RuntimeInitializerPolicy;
 import com.devicespooflab.hooks.utils.RuntimeSdkScope;
 import java.lang.reflect.Method;
 import java.util.Set;
@@ -23,6 +24,7 @@ public class WebViewHooks {
 
     private static final String TAG = "DeviceSpoofLab-WebView";
     private static final Set<Class<?>> SDK_RUNTIME_CLASSES = ConcurrentHashMap.newKeySet();
+    private static final Set<Class<?>> NATIVE_RUNTIME_CLASSES = ConcurrentHashMap.newKeySet();
     private static final Set<ClassLoader> SDK_RUNTIME_LOADERS = ConcurrentHashMap.newKeySet();
     private static final Set<Class<?>> USER_AGENT_CLASSES = ConcurrentHashMap.newKeySet();
     private static boolean runtimeSdkHooksInstalled;
@@ -42,7 +44,9 @@ public class WebViewHooks {
     /** Invoked on the main thread before initial or reloaded Build fields are applied. */
     public static void refreshRuntimeSdkGuard(XC_LoadPackage.LoadPackageParam lpparam) {
         runtimeSdkGuardNeeded = BuildHooks.requiresRuntimeSdkGuard(lpparam.packageName);
-        if (!runtimeSdkGuardNeeded || runtimeSdkHooksInstalled) return;
+        if (!runtimeSdkGuardNeeded) return;
+        hookNativeRuntimeInitializers(lpparam.classLoader);
+        if (runtimeSdkHooksInstalled) return;
         hookRuntimeSdkReaders();
         hookRuntimeDispatch(lpparam.classLoader);
         runtimeSdkHooksInstalled = true;
@@ -71,6 +75,37 @@ public class WebViewHooks {
         for (Method method : type.getDeclaredMethods()) XposedBridge.hookMethod(method, guard);
         XposedBridge.hookAllConstructors(type, guard);
         XposedBridge.log(TAG + ": Runtime SDK guard installed for " + type.getName());
+    }
+
+    private static void hookNativeRuntimeInitializers(ClassLoader loader) {
+        for (String name : RuntimeInitializerPolicy.LIBRARY_CLASSES) {
+            try {
+                Class<?> type = XposedHelpers.findClassIfExists(name, loader);
+                if (type != null) installNativeRuntimeInitializers(type);
+            } catch (Throwable unavailable) {
+                XposedBridge.log(TAG + ": Native initializer unavailable: " + name);
+            }
+        }
+    }
+
+    private static void installNativeRuntimeInitializers(Class<?> type) {
+        if (!NATIVE_RUNTIME_CLASSES.add(type)) return;
+        try {
+            boolean installed = false;
+            for (Method method : type.getDeclaredMethods()) {
+                if (RuntimeInitializerPolicy.isInitializer(method.getName(), method.getModifiers(),
+                    method.getReturnType(), method.getParameterTypes().length)) {
+                    XposedBridge.hookMethod(method, runtimeSdkHook());
+                    installed = true;
+                }
+            }
+            if (installed) XposedBridge.log(TAG + ": Native initializer SDK guard installed for " + type.getName());
+        } catch (Throwable unavailable) {
+            NATIVE_RUNTIME_CLASSES.remove(type);
+            XposedBridge.log(TAG + ": Native initializer SDK guard failed: " + type.getName());
+        }
+        // App native libraries share the app's loader. Do not classify its Handler callbacks
+        // as Chromium callbacks, or ordinary app dispatch would also use the physical SDK.
     }
 
     private static boolean webViewRuntime(Object value) {
@@ -118,7 +153,8 @@ public class WebViewHooks {
             if (!method.getName().equals("loadClass") || types.length == 0 || types[0] != String.class) continue;
             XposedBridge.hookMethod(method, new XC_MethodHook() {
                 @Override protected void beforeHookedMethod(MethodHookParam param) {
-                    if (runtimeSdkGuardNeeded && runtimeInfoClass((String) param.args[0])) {
+                    if (runtimeSdkGuardNeeded && (runtimeInfoClass((String) param.args[0])
+                        || RuntimeInitializerPolicy.isLibraryClass((String) param.args[0]))) {
                         param.setObjectExtra("smd.runtimeSdk", BuildHooks.useRuntimeSdk());
                     }
                 }
@@ -126,7 +162,11 @@ public class WebViewHooks {
                     Object lease = param.getObjectExtra("smd.runtimeSdk");
                     if (lease == null) return;
                     try {
-                        if (param.getResult() instanceof Class) installRuntimeSdkReaders((Class<?>) param.getResult());
+                        if (param.getResult() instanceof Class) {
+                            Class<?> type = (Class<?>) param.getResult();
+                            if (RuntimeInitializerPolicy.isLibraryClass(type.getName())) installNativeRuntimeInitializers(type);
+                            else installRuntimeSdkReaders(type);
+                        }
                     } finally { ((RuntimeSdkScope.Lease) lease).close(); }
                 }
             });
